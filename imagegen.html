@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>图片生成</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root[data-theme="dark"]{
+    --bg:#0d0d0d;--bg-card:#1a1a1a;--bg-card2:#222;--bg-hover:#2a2a2a;--bg-input:#111;
+    --border:#2e2e2e;--border2:#3a3a3a;--text:#f0f0f0;--text2:#999;--text3:#555;
+    --accent:#4f8ef7;--accent2:#3d7ae0;--accent-bg:rgba(79,142,247,.15);--checker:#242424;
+    --red:#f87171;--red-bg:rgba(248,113,113,.12);
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6f9;--bg-card:#fff;--bg-card2:#f0f2f5;--bg-hover:#eef1f5;--bg-input:#fff;
+    --border:#e4e7ec;--border2:#d5d9df;--text:#1a1d21;--text2:#5c636e;--text3:#9aa1ab;
+    --accent:#2f6bef;--accent2:#2457cc;--accent-bg:rgba(47,107,239,.1);--checker:#e9edf2;
+    --red:#dc2626;--red-bg:rgba(220,38,38,.1);
+  }
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;transition:background .25s,color .25s}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-size:18px;font-weight:700;margin-bottom:16px}
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:18px}
+  @media(max-width:800px){.layout{grid-template-columns:1fr}}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .fld{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  label{font-size:12px;color:var(--text2)}
+  input,select,textarea{font-family:inherit;font-size:13px;background:var(--bg-input);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;outline:none;width:100%}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  textarea{resize:vertical;min-height:60px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .color-row{display:flex;align-items:center;gap:8px}
+  .color-row input[type=color]{width:42px;height:34px;padding:2px;cursor:pointer}
+  .chk{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text2);cursor:pointer}
+  .chk input{width:auto}
+  button{font-size:14px;font-family:inherit;border:none;cursor:pointer;border-radius:8px;padding:11px 16px;transition:.15s;width:100%;font-weight:600}
+  .btn-p{background:var(--accent);color:#fff}
+  .btn-p:hover{background:var(--accent2)}
+  .btn-g{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+  .btn-g:hover{background:var(--bg-hover);color:var(--text)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chips button{width:auto;padding:5px 10px;font-size:12px;font-weight:500;background:transparent;color:var(--text2);border:1px solid var(--border2)}
+  .chips button:hover{background:var(--bg-hover);color:var(--text)}
+  .chips button.on{background:var(--accent);color:#fff;border-color:transparent}
+  .tabs{display:flex;gap:6px;background:var(--bg-card2);border:1px solid var(--border);border-radius:9px;padding:4px;margin-bottom:14px}
+  .tab{flex:1;text-align:center;padding:8px;border-radius:6px;cursor:pointer;color:var(--text2);font-weight:600;font-size:13px;border:none;background:transparent}
+  .tab.on{background:var(--accent);color:#fff}
+  .pane{display:none}.pane.on{display:block}
+  /* 折叠区 */
+  .sect{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+  .sect-h{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;user-select:none;font-weight:600;font-size:13px;background:var(--bg-card2)}
+  .sect-h:hover{background:var(--bg-hover)}
+  .sect-h .caret{color:var(--text3);transition:transform .18s}
+  .sect.open .sect-h .caret{transform:rotate(90deg)}
+  .sect-b{display:none;padding:14px 14px 2px}
+  .sect.open .sect-b{display:block}
+  /* 预览 */
+  .preview{display:flex;flex-direction:column}
+  .stage{flex:1;border:1px solid var(--border);border-radius:12px;background:
+    linear-gradient(45deg,var(--checker) 25%,transparent 25%),
+    linear-gradient(-45deg,var(--checker) 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,var(--checker) 75%),
+    linear-gradient(-45deg,transparent 75%,var(--checker) 75%);
+    background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0;
+    display:flex;align-items:center;justify-content:center;padding:20px;min-height:360px;overflow:auto;position:relative}
+  .stage.drag{outline:2px dashed var(--accent);outline-offset:-8px}
+  .stage .drophint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:var(--accent-bg);color:var(--accent);font-weight:700;font-size:15px;border-radius:12px;pointer-events:none}
+  .stage.drag .drophint{display:flex}
+  #cv{max-width:100%;max-height:520px;box-shadow:0 8px 30px rgba(0,0,0,.35);border-radius:2px}
+  .meta{margin-top:10px;font-size:12px;color:var(--text3);text-align:center}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-height:560px;overflow:auto;padding:4px}
+  .thumb{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-card2);text-align:center}
+  .thumb canvas{width:100%;display:block}
+  .thumb .cap{font-size:11px;color:var(--text2);padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  .bgline{display:flex;align-items:center;gap:8px}
+  .bgline button{width:auto;padding:7px 12px;font-size:12px}
+  .bgstat{font-size:12px;color:var(--text3);margin-top:6px}
+  .hint{font-size:11.5px;color:var(--text3);margin-top:6px}
+  /* 位置九宫格 */
+  .posgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:150px}
+  .posgrid button{width:100%;padding:0;aspect-ratio:1;font-size:12px;background:transparent;color:var(--text3);border:1px solid var(--border2);border-radius:6px;display:flex;align-items:center;justify-content:center}
+  .posgrid button:hover{background:var(--bg-hover);color:var(--text)}
+  .posgrid button.on{background:var(--accent);color:#fff;border-color:transparent}
+  /* 越界警告 */
+  .warn{display:none;margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);font-size:12.5px;font-weight:600;text-align:center}
+  .warn.show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>编号图片生成器</h1>
+  <div class="layout">
+    <div class="card">
+      <div class="tabs">
+        <button class="tab on" data-m="single" onclick="switchMode('single')">单张</button>
+        <button class="tab" data-m="batch" onclick="switchMode('batch')">批量</button>
+      </div>
+
+      <!-- 单张内容 -->
+      <div id="mSingle" class="pane on">
+        <div class="fld">
+          <label>内容（支持多行）</label>
+          <textarea id="content" spellcheck="false">1</textarea>
+        </div>
+      </div>
+
+      <!-- 批量序列 -->
+      <div id="mBatch" class="pane">
+        <div class="fld">
+          <label>序列（范围 <code>1-100</code>、带步长 <code>1-100:5</code>，或逗号/换行列表）</label>
+          <textarea id="seq" spellcheck="false" placeholder="例如：1-20  或  1-100:5  或  A,B,C">1-9</textarea>
+        </div>
+        <div class="fld">
+          <div class="three">
+            <div><label>前缀</label><input id="prefix" type="text" placeholder="如 No." /></div>
+            <div><label>后缀</label><input id="suffix" type="text" placeholder="如 号" /></div>
+            <div><label>补零位数</label><input id="pad" type="number" min="0" value="0" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图像设置（默认收起） -->
+      <div class="sect" id="sectImage">
+        <div class="sect-h" onclick="toggleSect('sectImage')"><span>图像设置</span><span class="caret">▸</span></div>
+        <div class="sect-b">
+          <div class="fld">
+            <label>画布尺寸（像素）</label>
+            <div class="two">
+              <input id="w" type="number" value="400" min="1" />
+              <input id="h" type="number" value="400" min="1" />
+            </div>
+            <div class="chips">
+              <button onclick="setSize(400,400)">400×400</button>
+              <button onclick="setSize(800,600)">800×600</button>
+              <button onclick="setSize(1080,1080)">1080×1080</button>
+              <button onclick="setSize(1920,1080)">1920×1080</button>
+            </div>
+          </div>
+          <div class="fld">
+            <label>背景颜色</label>
+            <div class="color-row"><input id="bg" type="color" value="#000000" /><input id="bgHex" type="text" value="#000000" /></div>
+            <label class="chk"><input id="transparent" type="checkbox" /> 透明背景</label>
+          </div>
+          <div class="fld">
+            <label>背景图片</label>
+            <div class="bgline">
+              <button class="btn-g" onclick="document.getElementById('bgFile').click()">选择图片</button>
+              <button class="btn-g" onclick="clearBg()">清除</button>
+              <input id="bgFile" type="file" accept="image/*" style="display:none" />
+            </div>
+            <div id="bgStat" class="bgstat">未设置（可将图片拖拽到右侧预览区）</div>
+            <div class="hint">背景图以「覆盖(cover)」方式填满画布；透明背景勾选时忽略图片与颜色。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 字体设置（默认收起） -->
+      <div class="sect" id="sectFont">
+        <div class="sect-h" onclick="toggleSect('sectFont')"><span>字体设置</span><span class="caret">▸</span></div>
+        <div class="sect-b">
+          <div class="fld">
+            <label>字号</label>
+            <input id="fontSize" type="number" placeholder="自动铺满" min="1" />
+            <div id="sizeChips" class="chips">
+              <button data-s="" class="on" onclick="setFont('')">自动</button>
+              <button data-s="48" onclick="setFont(48)">48</button>
+              <button data-s="72" onclick="setFont(72)">72</button>
+              <button data-s="96" onclick="setFont(96)">96</button>
+              <button data-s="150" onclick="setFont(150)">150</button>
+              <button data-s="200" onclick="setFont(200)">200</button>
+              <button data-s="300" onclick="setFont(300)">300</button>
+            </div>
+          </div>
+          <div class="fld">
+            <label>字体</label>
+            <select id="fontFamily">
+              <option value='"Microsoft YaHei","PingFang SC",sans-serif'>微软雅黑 / 苹方</option>
+              <option value="SimHei,sans-serif">黑体</option>
+              <option value="SimSun,serif">宋体</option>
+              <option value="KaiTi,serif">楷体</option>
+              <option value="Arial,Helvetica,sans-serif">Arial</option>
+              <option value="Impact,fantasy">Impact</option>
+              <option value='Consolas,"Courier New",monospace'>等宽 Mono</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label>文字颜色</label>
+            <div class="color-row"><input id="fg" type="color" value="#ffffff" /><input id="fgHex" type="text" value="#ffffff" /></div>
+          </div>
+          <div class="fld">
+            <label>字重</label>
+            <select id="weight"><option value="400">常规</option><option value="700" selected>加粗</option><option value="900">特粗</option></select>
+          </div>
+          <div class="fld">
+            <label>文字位置（预设）</label>
+            <div id="posGrid" class="posgrid">
+              <button data-pos="tl" title="左上">↖</button>
+              <button data-pos="tc" title="上中">↑</button>
+              <button data-pos="tr" title="右上">↗</button>
+              <button data-pos="ml" title="左中">←</button>
+              <button data-pos="mc" class="on" title="居中">●</button>
+              <button data-pos="mr" title="右中">→</button>
+              <button data-pos="bl" title="左下">↙</button>
+              <button data-pos="bc" title="下中">↓</button>
+              <button data-pos="br" title="右下">↘</button>
+            </div>
+          </div>
+          <div class="fld">
+            <label>坐标（锚点像素，X / Y）</label>
+            <div class="two">
+              <input id="posX" type="number" placeholder="X" />
+              <input id="posY" type="number" placeholder="Y" />
+            </div>
+            <div class="hint">点击预设自动填入锚点坐标；也可手动输入。锚点对齐方式由预设列/行决定。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 动作 -->
+      <div id="actSingle">
+        <button class="btn-p" onclick="downloadSingle()">⬇ 导出 PNG</button>
+      </div>
+      <div id="actBatch" style="display:none">
+        <button class="btn-p" onclick="downloadZip()">⬇ 打包下载 ZIP</button>
+        <div class="row2">
+          <button class="btn-g" onclick="renderBatch()">刷新预览</button>
+          <button class="btn-g" onclick="downloadEach()">逐个下载</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview">
+      <div id="stageSingle" class="stage"><canvas id="cv" width="400" height="400"></canvas><div class="drophint">松开以设为背景</div></div>
+      <div id="stageBatch" class="stage" style="display:none"><div id="grid" class="grid" style="width:100%"></div><div class="drophint">松开以设为背景</div></div>
+      <div id="meta" class="meta"></div>
+      <div id="warn" class="warn">⚠ 文字已超出画布范围，请调整位置、坐标或字号</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+const $=s=>document.getElementById(s);
+const cv=$('cv'), ctx=cv.getContext('2d');
+const PREVIEW_MAX=80;
+let mode='single', bgImg=null;
+
+/* 折叠区 */
+function toggleSect(id){ $(id).classList.toggle('open'); }
+
+/* 颜色联动 */
+function syncHex(colorId,hexId){
+  $(colorId).addEventListener('input',()=>{ $(hexId).value=$(colorId).value; refresh(); });
+  $(hexId).addEventListener('input',()=>{ if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test($(hexId).value)){ $(colorId).value=$(hexId).value; refresh(); } });
+}
+syncHex('fg','fgHex'); syncHex('bg','bgHex');
+
+['content','seq','prefix','suffix','pad','w','h','fontSize','fontFamily','transparent','weight'].forEach(id=>{
+  $(id).addEventListener('input',refresh); $(id).addEventListener('change',refresh);
+});
+
+function setSize(w,h){ $('w').value=w; $('h').value=h; refresh(); }
+function setFont(s){
+  $('fontSize').value = s===''?'':s;
+  document.querySelectorAll('#sizeChips button').forEach(b=>b.classList.toggle('on', String(b.dataset.s)===String(s)));
+  refresh();
+}
+$('fontSize').addEventListener('input',()=>{
+  const v=$('fontSize').value;
+  document.querySelectorAll('#sizeChips button').forEach(b=>b.classList.toggle('on', String(b.dataset.s)===String(v)));
+});
+
+/* 背景图片 */
+function loadBgFile(file){
+  if(!file || !file.type.startsWith('image/')) return;
+  const r=new FileReader();
+  r.onload=e=>{ const img=new Image(); img.onload=()=>{ bgImg=img; $('bgStat').textContent=`已设置背景（${img.width}×${img.height}）`; refresh(); }; img.src=e.target.result; };
+  r.readAsDataURL(file);
+}
+function clearBg(){ bgImg=null; $('bgFile').value=''; $('bgStat').textContent='未设置（可将图片拖拽到右侧预览区）'; refresh(); }
+$('bgFile').addEventListener('change',e=>loadBgFile(e.target.files[0]));
+
+/* 拖拽到预览区 */
+['stageSingle','stageBatch'].forEach(id=>{
+  const st=$(id);
+  st.addEventListener('dragover',e=>{ e.preventDefault(); st.classList.add('drag'); });
+  st.addEventListener('dragleave',e=>{ if(e.target===st) st.classList.remove('drag'); });
+  st.addEventListener('drop',e=>{ e.preventDefault(); st.classList.remove('drag'); const f=e.dataTransfer.files[0]; if(f) loadBgFile(f); });
+});
+
+/* 位置预设 */
+let posPreset='mc', posAlign='center', posVAlign='middle';
+const POS_ALIGN={tl:['left','top'],tc:['center','top'],tr:['right','top'],
+  ml:['left','middle'],mc:['center','middle'],mr:['right','middle'],
+  bl:['left','bottom'],bc:['center','bottom'],br:['right','bottom']};
+function padOf(W,H){ return Math.max(10,Math.min(W,H)*0.06); }
+function presetCoords(pos,W,H){
+  const [al,va]=POS_ALIGN[pos]||['center','middle']; const p=padOf(W,H);
+  const x = al==='left'? p : al==='right'? W-p : W/2;
+  const y = va==='top'? p : va==='bottom'? H-p : H/2;
+  return {x:Math.round(x),y:Math.round(y),al,va};
+}
+function applyPreset(pos){
+  const c=presetCoords(pos, Math.max(1,parseInt($('w').value)||1), Math.max(1,parseInt($('h').value)||1));
+  posPreset=pos; posAlign=c.al; posVAlign=c.va;
+  document.querySelectorAll('#posGrid button').forEach(b=>b.classList.toggle('on',b.dataset.pos===pos));
+  $('posX').value=c.x; $('posY').value=c.y;
+  refresh();
+}
+document.querySelectorAll('#posGrid button').forEach(b=>b.onclick=()=>applyPreset(b.dataset.pos));
+['posX','posY'].forEach(id=>$(id).addEventListener('input',()=>{
+  posPreset=null; document.querySelectorAll('#posGrid button').forEach(b=>b.classList.remove('on')); refresh();
+}));
+// 画布尺寸变化时，若仍处于预设状态则重算锚点坐标
+['w','h'].forEach(id=>$(id).addEventListener('input',()=>{ if(posPreset) applyPreset(posPreset); }));
+
+/* 样式读取 */
+function style(){
+  const W=Math.max(1,parseInt($('w').value)||1), H=Math.max(1,parseInt($('h').value)||1);
+  let px=parseFloat($('posX').value), py=parseFloat($('posY').value);
+  if(isNaN(px)||isNaN(py)){ const c=presetCoords(posPreset||'mc',W,H); if(isNaN(px))px=c.x; if(isNaN(py))py=c.y; }
+  return {
+    W,H,
+    manual:parseInt($('fontSize').value)||0,
+    family:$('fontFamily').value,
+    weight:$('weight').value,
+    fg:$('fg').value,
+    bg:$('bg').value,
+    transparent:$('transparent').checked,
+    posX:px, posY:py, align:posAlign, vAlign:posVAlign,
+  };
+}
+function fitFont(c,lines,st){
+  let size=Math.floor(st.H); const padding=Math.max(10,Math.min(st.W,st.H)*0.06);
+  while(size>4){
+    c.font=`${st.weight} ${size}px ${st.family}`;
+    const widest=Math.max(...lines.map(l=>c.measureText(l||' ').width));
+    const totalH=lines.length*size*1.15;
+    if(widest<=st.W-2*padding && totalH<=st.H-2*padding) break;
+    size-=2;
+  }
+  return size;
+}
+function drawCover(c,img,W,H){
+  const ir=img.width/img.height, cr=W/H; let dw,dh,dx,dy;
+  if(ir>cr){ dh=H; dw=H*ir; dx=(W-dw)/2; dy=0; } else { dw=W; dh=W/ir; dx=0; dy=(H-dh)/2; }
+  c.drawImage(img,dx,dy,dw,dh);
+}
+/* 渲染文本到指定 canvas */
+function renderTo(canvas,text,st){
+  const c=canvas.getContext('2d');
+  canvas.width=st.W; canvas.height=st.H;
+  c.clearRect(0,0,st.W,st.H);
+  if(!st.transparent){
+    if(bgImg){ drawCover(c,bgImg,st.W,st.H); }
+    else { c.fillStyle=st.bg; c.fillRect(0,0,st.W,st.H); }
+  }
+  const lines=String(text).split(/\r?\n/);
+  const size = st.manual>0 ? st.manual : fitFont(c,lines,st);
+  c.font=`${st.weight} ${size}px ${st.family}`;
+  c.fillStyle=st.fg; c.textAlign=st.align; c.textBaseline='middle';
+  c.lineJoin='round';
+  // 特粗：叠加描边加厚，确保与「加粗」有明显区别（很多字体无 900 字重）
+  const strokeW = st.weight==='900' ? size*0.045 : (st.weight==='700' ? size*0.012 : 0);
+  const lineH=size*1.15, blockH=lines.length*lineH;
+  // 依据垂直对齐计算文本块顶部（锚点为 posX/posY）
+  const blockTop = st.vAlign==='top' ? st.posY
+                 : st.vAlign==='bottom' ? st.posY-blockH
+                 : st.posY-blockH/2;
+  let widest=0;
+  lines.forEach((l,i)=>{
+    const y=blockTop+i*lineH+lineH/2;
+    widest=Math.max(widest,c.measureText(l||' ').width);
+    if(strokeW>0){ c.lineWidth=strokeW; c.strokeStyle=st.fg; c.strokeText(l,st.posX,y); }
+    c.fillText(l,st.posX,y);
+  });
+  // 计算文本包围盒并判断是否越界
+  let left,right;
+  if(st.align==='left'){ left=st.posX; right=st.posX+widest; }
+  else if(st.align==='right'){ left=st.posX-widest; right=st.posX; }
+  else { left=st.posX-widest/2; right=st.posX+widest/2; }
+  const top=blockTop, bottom=blockTop+blockH;
+  const overflow = left<-0.5 || top<-0.5 || right>st.W+0.5 || bottom>st.H+0.5;
+  return {size, overflow};
+}
+
+/* ── 单张 ── */
+function drawSingle(){
+  const st=style();
+  const r=renderTo(cv,$('content').value||'',st);
+  $('meta').textContent=`${st.W} × ${st.H}px · 字号 ${st.manual>0?st.manual:r.size+'（自动）'}${bgImg&&!st.transparent?' · 图片背景':''}${st.transparent?' · 透明背景':''}`;
+  $('warn').classList.toggle('show', r.overflow);
+}
+function safeName(t){ return (String(t).split(/\r?\n/)[0]).replace(/[\\/:*?"<>|]/g,'_').slice(0,40)||'image'; }
+function downloadSingle(){
+  drawSingle();
+  const a=document.createElement('a');
+  a.download=`${safeName($('content').value)}_${cv.width}x${cv.height}.png`;
+  a.href=cv.toDataURL('image/png'); a.click();
+}
+
+/* ── 批量 ── */
+function parseSequence(str){
+  const items=[];
+  str.split(/[\n,]+/).forEach(part=>{
+    part=part.trim(); if(!part) return;
+    const m=part.match(/^(-?\d+)\s*-\s*(-?\d+)(?::(\d+))?$/);
+    if(m){
+      let a=+m[1], b=+m[2], step=m[3]?Math.max(1,+m[3]):1;
+      if(a<=b){ for(let i=a;i<=b;i+=step) items.push(i); }
+      else{ for(let i=a;i>=b;i-=step) items.push(i); }
+    } else items.push(part);
+  });
+  return items;
+}
+function decorate(v){
+  const pre=$('prefix').value, suf=$('suffix').value, pad=parseInt($('pad').value)||0;
+  let core=String(v);
+  if(pad>0 && /^-?\d+$/.test(core)){
+    const neg=core.startsWith('-'); const digits=neg?core.slice(1):core;
+    core=(neg?'-':'')+digits.padStart(pad,'0');
+  }
+  return pre+core+suf;
+}
+function batchItems(){ return parseSequence($('seq').value).map(decorate); }
+
+function renderBatch(){
+  const st=style();
+  const items=batchItems();
+  const grid=$('grid'); grid.innerHTML='';
+  const shown=items.slice(0,PREVIEW_MAX);
+  let anyOver=false;
+  shown.forEach(text=>{
+    const wrap=document.createElement('div'); wrap.className='thumb';
+    const c=document.createElement('canvas');
+    const r=renderTo(c,text,st); if(r.overflow) anyOver=true;
+    const cap=document.createElement('div'); cap.className='cap'; cap.textContent=text;
+    wrap.appendChild(c); wrap.appendChild(cap); grid.appendChild(wrap);
+  });
+  $('warn').classList.toggle('show', anyOver);
+  $('meta').textContent=`共 ${items.length} 张 · ${st.W}×${st.H}px`+(bgImg&&!st.transparent?' · 图片背景':'')+(items.length>PREVIEW_MAX?` · 预览前 ${PREVIEW_MAX} 张`:'');
+}
+
+function eachToBlob(canvas){ return new Promise(res=>canvas.toBlob(res,'image/png')); }
+
+async function downloadZip(){
+  const st=style(); const items=batchItems();
+  if(!items.length){ alert('序列为空'); return; }
+  if(!window.JSZip){ await downloadEach(); return; }
+  const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='打包中…'; }
+  try{
+    const zip=new JSZip();
+    const tmp=document.createElement('canvas');
+    const width=String(items.length).length;
+    for(let i=0;i<items.length;i++){
+      renderTo(tmp,items[i],st);
+      const blob=await eachToBlob(tmp);
+      zip.file(`${String(i+1).padStart(width,'0')}_${safeName(items[i])}.png`, blob);
+    }
+    const out=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.download=`images_${items.length}张_${st.W}x${st.H}.zip`;
+    a.href=URL.createObjectURL(out); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  } finally { if(btn){ btn.disabled=false; btn.textContent='⬇ 打包下载 ZIP'; } }
+}
+
+async function downloadEach(){
+  const st=style(); const items=batchItems();
+  if(!items.length){ alert('序列为空'); return; }
+  if(items.length>30 && !confirm(`将逐个下载 ${items.length} 个文件，浏览器可能拦截，确定继续？`)) return;
+  const tmp=document.createElement('canvas');
+  const width=String(items.length).length;
+  for(let i=0;i<items.length;i++){
+    renderTo(tmp,items[i],st);
+    const a=document.createElement('a');
+    a.download=`${String(i+1).padStart(width,'0')}_${safeName(items[i])}.png`;
+    a.href=tmp.toDataURL('image/png'); a.click();
+    await new Promise(r=>setTimeout(r,250));
+  }
+}
+
+/* ── 模式切换 / 刷新 ── */
+function refresh(){ mode==='single'?drawSingle():renderBatch(); }
+function switchMode(m){
+  mode=m;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.m===m));
+  $('mSingle').classList.toggle('on',m==='single');
+  $('mBatch').classList.toggle('on',m==='batch');
+  $('stageSingle').style.display = m==='single'?'':'none';
+  $('stageBatch').style.display = m==='single'?'none':'';
+  $('actSingle').style.display = m==='single'?'':'none';
+  $('actBatch').style.display = m==='single'?'none':'';
+  refresh();
+}
+
+applyPreset('mc');
+</script>
+<script>
+window.addEventListener('message',function(e){if(e.data&&e.data.type==='yb-theme'){document.documentElement.setAttribute('data-theme',e.data.theme==='light'?'light':'dark');}});
+</script>
+</body>
+</html>

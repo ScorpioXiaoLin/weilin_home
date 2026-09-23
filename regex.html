@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>正则提取</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root[data-theme="dark"]{
+    --bg:#0d0d0d;--bg-card:#1a1a1a;--bg-card2:#222;--bg-hover:#2a2a2a;--bg-input:#111;
+    --border:#2e2e2e;--border2:#3a3a3a;--text:#f0f0f0;--text2:#999;--text3:#555;
+    --accent:#4f8ef7;--accent2:#3d7ae0;--accent-bg:rgba(79,142,247,.15);
+    --green:#4ade80;--red:#f87171;--yellow:#f59e0b;--mark:rgba(245,158,11,.32);
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6f9;--bg-card:#fff;--bg-card2:#f0f2f5;--bg-hover:#eef1f5;--bg-input:#fff;
+    --border:#e4e7ec;--border2:#d5d9df;--text:#1a1d21;--text2:#5c636e;--text3:#9aa1ab;
+    --accent:#2f6bef;--accent2:#2457cc;--accent-bg:rgba(47,107,239,.1);
+    --green:#16a34a;--red:#dc2626;--yellow:#d97706;--mark:rgba(217,119,6,.28);
+  }
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;transition:background .25s,color .25s}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-size:18px;font-weight:700;margin-bottom:16px}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+  button{font-size:13px;font-family:inherit;border:none;cursor:pointer;border-radius:7px;padding:7px 13px;transition:.15s;background:transparent;color:var(--text2);border:1px solid var(--border2)}
+  button:hover{background:var(--bg-hover);color:var(--text)}
+  button.p{background:var(--accent);color:#fff;border-color:transparent;font-weight:600}
+  button.p:hover{background:var(--accent2)}
+  .tabs{display:flex;gap:6px;background:var(--bg-card2);border:1px solid var(--border);border-radius:9px;padding:4px;margin-bottom:16px}
+  .tab{flex:1;text-align:center;padding:8px;border-radius:6px;cursor:pointer;color:var(--text2);font-weight:600;font-size:13px;border:none;background:transparent}
+  .tab.active{background:var(--accent);color:#fff}
+  .pane{display:none}.pane.active{display:block}
+  .fld{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+  label{font-size:12px;color:var(--text2)}
+  input,select,textarea{font-family:inherit;font-size:13px;background:var(--bg-input);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;outline:none;width:100%}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  textarea{resize:vertical;min-height:110px;font-family:"SFMono-Regular",Consolas,monospace;line-height:1.7}
+  .re-row{display:flex;align-items:stretch;gap:0;border:1px solid var(--border2);border-radius:7px;overflow:hidden;background:var(--bg-input)}
+  .re-row.err{border-color:var(--red)}
+  .re-slash{display:flex;align-items:center;padding:0 10px;color:var(--text3);font-family:Consolas,monospace;background:var(--bg-card2)}
+  .re-row input{border:none;border-radius:0;background:transparent;font-family:"SFMono-Regular",Consolas,monospace}
+  .re-flags{display:flex;align-items:center;padding:0 10px;font-family:Consolas,monospace;color:var(--accent);background:var(--bg-card2);white-space:nowrap;min-width:44px;justify-content:center}
+  .flags{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2);cursor:pointer}
+  .chk input{width:auto}
+  .msg{font-size:12px;margin-top:6px;min-height:18px}
+  .msg.ok{color:var(--green)}.msg.err{color:var(--red)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chips button{padding:5px 10px;font-size:12px}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 12px}
+  .stat{background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;min-width:88px}
+  .stat b{display:block;font-size:18px;font-weight:800;color:var(--accent)}
+  .stat span{font-size:11px;color:var(--text3)}
+  .hl{background:var(--bg-input);border:1px solid var(--border2);border-radius:7px;padding:10px 12px;min-height:60px;max-height:240px;overflow:auto;font-family:"SFMono-Regular",Consolas,monospace;font-size:13px;white-space:pre-wrap;word-break:break-all}
+  .hl mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+  .list{border:1px solid var(--border2);border-radius:7px;max-height:260px;overflow:auto;margin-top:4px}
+  .list-item{padding:7px 12px;border-bottom:1px solid var(--border);font-family:"SFMono-Regular",Consolas,monospace;font-size:12.5px;display:flex;gap:10px;align-items:baseline}
+  .list-item:last-child{border-bottom:none}
+  .list-item .idx{color:var(--text3);flex-shrink:0;min-width:34px}
+  .list-item .val{color:var(--green);word-break:break-all}
+  .list-item .grp{color:var(--text2);font-size:11.5px}
+  .empty{padding:16px;color:var(--text3);text-align:center;font-size:12.5px}
+  .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+  .bar .lbl{font-size:12px;color:var(--text2)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:680px){.two{grid-template-columns:1fr}}
+  .sub{font-size:12px;color:var(--text3);margin-top:4px}
+  .sub a{color:var(--accent)}
+  /* 分类速查表 */
+  .cheat-cats{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.cheat-cats{grid-template-columns:1fr}}
+  .cheat-cat{border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .cheat-h{background:var(--bg-card2);padding:8px 12px;font-weight:700;font-size:12.5px;color:var(--text)}
+  .cheat-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 12px;border-top:1px solid var(--border)}
+  .cheat-row code{font-family:Consolas,monospace;font-size:12.5px;color:var(--accent);white-space:nowrap}
+  .cheat-row span{font-size:12px;color:var(--text2);text-align:right}
+  /* 代码块 */
+  .code{background:var(--bg-input);border:1px solid var(--border2);border-radius:7px;padding:12px 14px;font-family:"SFMono-Regular",Consolas,monospace;font-size:12.5px;line-height:1.65;white-space:pre;overflow:auto;color:var(--text);max-height:340px;margin:0}
+  details{border:1px solid var(--border);border-radius:10px;padding:0;margin-bottom:16px;overflow:hidden}
+  summary{padding:12px 16px;cursor:pointer;font-weight:600;font-size:13px;background:var(--bg-card2);user-select:none}
+  details[open] summary{border-bottom:1px solid var(--border)}
+  .details-body{padding:14px 16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>正则提取</h1>
+
+  <div class="tabs">
+    <button class="tab active" data-p="extract" onclick="switchTab('extract')">正则提取</button>
+    <button class="tab" data-p="build" onclick="switchTab('build')">表达式生成</button>
+  </div>
+
+  <!-- ===== 正则提取 ===== -->
+  <div id="extract" class="pane active">
+    <div class="card">
+      <div class="fld">
+        <label>正则表达式</label>
+        <div class="re-row" id="reRow">
+          <span class="re-slash">/</span>
+          <input id="pattern" type="text" spellcheck="false" placeholder="例如 1[3-9]\d{9}" />
+          <span class="re-flags" id="flagsDisp">g</span>
+        </div>
+        <div class="flags">
+          <label class="chk"><input id="fg" type="checkbox" checked /> g 全局</label>
+          <label class="chk"><input id="fi" type="checkbox" /> i 忽略大小写</label>
+          <label class="chk"><input id="fm" type="checkbox" /> m 多行</label>
+          <label class="chk"><input id="fs" type="checkbox" /> s 单行(.匹配换行)</label>
+        </div>
+        <div id="reMsg" class="msg"></div>
+        <div class="chips" id="presetChips"></div>
+      </div>
+
+      <div class="fld">
+        <label>待处理文本（粘贴到此）</label>
+        <textarea id="text" spellcheck="false" placeholder="在此粘贴文本…"></textarea>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><b id="stMatch">0</b><span>匹配数</span></div>
+        <div class="stat"><b id="stGroup">0</b><span>捕获组</span></div>
+        <div class="stat"><b id="stChar">0</b><span>字符数</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="bar"><span class="lbl">高亮预览</span></div>
+      <div id="hl" class="hl"><span class="empty" style="padding:0">在上方输入正则与文本，匹配结果将在此高亮…</span></div>
+    </div>
+
+    <div class="two">
+      <div class="card">
+        <div class="bar"><span class="lbl">匹配列表</span></div>
+        <div id="list" class="list"><div class="empty">暂无匹配</div></div>
+      </div>
+      <div class="card">
+        <div class="bar"><span class="lbl">提取结果（每行一条）</span><button onclick="copyArea('extractOut')">复制</button></div>
+        <textarea id="extractOut" spellcheck="false" readonly placeholder="提取到的内容会出现在这里…"></textarea>
+        <label class="chk" style="margin-top:8px"><input id="useGroup" type="checkbox" /> 仅输出第 1 个捕获组（若存在）</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="bar"><span class="lbl">替换（可选）</span><button onclick="copyArea('replaceOut')">复制</button></div>
+      <div class="fld"><input id="replaceWith" type="text" spellcheck="false" placeholder="替换为…支持 $1 $2 引用捕获组" /></div>
+      <textarea id="replaceOut" spellcheck="false" readonly placeholder="替换后的完整文本会出现在这里…"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="bar">
+        <span class="lbl">代码生成（随正则/文本联动）</span>
+        <span style="display:flex;gap:6px">
+          <select id="codeLang" style="width:auto;padding:5px 8px">
+            <option value="python">Python</option>
+            <option value="js">JavaScript</option>
+          </select>
+          <button onclick="copyText2('codeOut')">复制</button>
+        </span>
+      </div>
+      <pre id="codeOut" class="code">— 输入正则表达式后生成 —</pre>
+    </div>
+  </div>
+
+  <!-- ===== 表达式生成 ===== -->
+  <div id="build" class="pane">
+    <div class="card">
+      <div class="fld">
+        <label>完整字符串（原文示例，可多行；每行一个样本）</label>
+        <textarea id="genSource" spellcheck="false" placeholder="例如：&#10;订单号 ABC-2024-001 已发货&#10;订单号 XYZ-2023-088 待付款"></textarea>
+      </div>
+      <div class="fld">
+        <label>需要提取的内容（必须出现在上面的字符串中）</label>
+        <input id="genTarget" type="text" spellcheck="false" placeholder="例如 ABC-2024-001" />
+        <div class="sub">思路：在完整字符串中定位「需要提取的内容」，据此生成能提取它的正则。</div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>内容生成方式</label>
+          <select id="genMode">
+            <option value="smart">智能泛化（数字→\d+、字母→[A-Za-z]+ 等）</option>
+            <option value="literal">字面精确（转义特殊字符，原样匹配）</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>上下文定位</label>
+          <select id="genCtx">
+            <option value="0">不使用上下文（仅匹配内容本身）</option>
+            <option value="1">前后各 1 个字符定位</option>
+            <option value="2">前后各 2 个字符定位</option>
+            <option value="3" selected>前后各 3 个字符定位</option>
+            <option value="all">整行前后全部作为定位</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld">
+        <div class="flags">
+          <label class="chk"><input id="genExact" type="checkbox" /> 数字/字母按精确长度 {n}</label>
+          <label class="chk"><input id="genAnchor" type="checkbox" /> 锚定首尾 ^…$（仅无上下文时建议）</label>
+        </div>
+      </div>
+      <button class="p" style="width:auto" onclick="buildExpr()">生成表达式</button>
+    </div>
+
+    <div class="card">
+      <div class="bar"><span class="lbl">生成结果</span><button onclick="copyText('genOut')">复制</button></div>
+      <div class="re-row"><span class="re-slash">/</span><input id="genOut" type="text" spellcheck="false" readonly /><span class="re-flags">g</span></div>
+      <div id="genMsg" class="msg"></div>
+      <div class="bar" style="margin-top:12px"><span class="lbl">提取预览（应用到完整字符串）</span></div>
+      <textarea id="genPreview" spellcheck="false" readonly placeholder="生成后，这里显示从完整字符串中提取到的内容…"></textarea>
+      <button style="margin-top:10px" onclick="useGenerated()">↖ 用到「正则提取」中测试</button>
+    </div>
+  </div>
+
+  <details open>
+    <summary>语法速查表（按类型分类）</summary>
+    <div class="details-body">
+      <div class="cheat-cats">
+        <div class="cheat-cat">
+          <div class="cheat-h">字符类</div>
+          <div class="cheat-row"><code>.</code><span>任意字符（除换行）</span></div>
+          <div class="cheat-row"><code>\d</code><span>数字 [0-9]</span></div>
+          <div class="cheat-row"><code>\D</code><span>非数字</span></div>
+          <div class="cheat-row"><code>\w</code><span>字母/数字/下划线</span></div>
+          <div class="cheat-row"><code>\W</code><span>非 \w</span></div>
+          <div class="cheat-row"><code>\s</code><span>空白字符</span></div>
+          <div class="cheat-row"><code>\S</code><span>非空白</span></div>
+          <div class="cheat-row"><code>[abc]</code><span>字符集 a 或 b 或 c</span></div>
+          <div class="cheat-row"><code>[^abc]</code><span>排除字符集</span></div>
+          <div class="cheat-row"><code>[\u4e00-\u9fa5]</code><span>中文字符串</span></div>
+        </div>
+        <div class="cheat-cat">
+          <div class="cheat-h">量词</div>
+          <div class="cheat-row"><code>*</code><span>0 次或多次</span></div>
+          <div class="cheat-row"><code>+</code><span>1 次或多次</span></div>
+          <div class="cheat-row"><code>?</code><span>0 次或 1 次</span></div>
+          <div class="cheat-row"><code>{n}</code><span>恰好 n 次</span></div>
+          <div class="cheat-row"><code>{n,}</code><span>n 次或更多</span></div>
+          <div class="cheat-row"><code>{m,n}</code><span>m 到 n 次</span></div>
+          <div class="cheat-row"><code>*?</code><span>非贪婪 0+</span></div>
+          <div class="cheat-row"><code>+?</code><span>非贪婪 1+</span></div>
+          <div class="cheat-row"><code>{m,n}?</code><span>非贪婪范围</span></div>
+        </div>
+        <div class="cheat-cat">
+          <div class="cheat-h">锚点 & 边界</div>
+          <div class="cheat-row"><code>^</code><span>行/字符串开头</span></div>
+          <div class="cheat-row"><code>$</code><span>行/字符串结尾</span></div>
+          <div class="cheat-row"><code>\b</code><span>单词边界</span></div>
+          <div class="cheat-row"><code>\B</code><span>非单词边界</span></div>
+          <div class="cheat-row"><code>(?=...)</code><span>正向先行断言</span></div>
+          <div class="cheat-row"><code>(?!...)</code><span>负向先行断言</span></div>
+          <div class="cheat-row"><code>(?&lt;=...)</code><span>正向后行断言</span></div>
+          <div class="cheat-row"><code>(?&lt;!...)</code><span>负向后行断言</span></div>
+        </div>
+        <div class="cheat-cat">
+          <div class="cheat-h">分组</div>
+          <div class="cheat-row"><code>(...)</code><span>捕获分组</span></div>
+          <div class="cheat-row"><code>(?:...)</code><span>非捕获分组</span></div>
+          <div class="cheat-row"><code>(?&lt;name&gt;...)</code><span>命名捕获组</span></div>
+          <div class="cheat-row"><code>\1 \2</code><span>反向引用</span></div>
+          <div class="cheat-row"><code>$1 $2</code><span>替换中引用</span></div>
+          <div class="cheat-row"><code>(a|b)</code><span>a 或 b</span></div>
+        </div>
+      </div>
+      <div class="sub" style="margin-top:12px">参考：<a href="https://www.jyshare.com/front-end/854/" target="_blank" rel="noopener">菜鸟工具 · 正则表达式在线测试</a></div>
+    </div>
+  </details>
+</div>
+
+<script>
+const $=s=>document.getElementById(s);
+
+/* 常用表达式库：[名称, 表达式, 示例文本] —— 点击同时填充表达式与待处理文本 */
+const PRESETS=[
+  ['手机号', '1[3-9]\\d{9}', '13800138000 10086 19912345678\n座机 010-88886666\n联系 13500001111'],
+  ['邮箱', '[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+', 'admin@example.com 无效地址@ test.user@mail.co.uk\n客服：service@qq.com'],
+  ['身份证', '\\d{17}[\\dXx]|\\d{15}', '110101199003078515\n320311770706001\n44030019991201123X'],
+  ['URL', 'https?:\\/\\/[^\\s"\'<>]+', '访问 https://www.example.com/page?id=1 或 http://test.cn 了解详情'],
+  ['IPv4', '\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b', '服务器 192.168.1.1 网关 10.0.0.254\nDNS 8.8.8.8 与 114.114.114.114'],
+  ['日期', '\\d{4}-\\d{1,2}-\\d{1,2}', '开始 2024-01-05 结束 2024/12/31\n备注 2023-9-1 生效'],
+  ['中文', '[\\u4e00-\\u9fa5]+', 'Hello 你好世界 abc 正则表达式 123 提取工具'],
+  ['整数/小数', '-?\\d+(?:\\.\\d+)?', '价格 12.5 数量 -3 总计 100 折扣 0.85'],
+  ['十六进制色', '#[0-9a-fA-F]{6}', '主色 #4f8ef7 背景 #1a1a1a 强调色 #FF5733'],
+  ['QQ号', '[1-9]\\d{4,}', 'QQ：12345 联系 987654321 群号 88888888'],
+  ['邮政编码', '[1-9]\\d{5}', '北京 100000 上海 200000 广州 510000'],
+  ['HTML标签', '<[^>]+>', '<div class="box"><p>文本内容</p></div><br/>'],
+];
+(function(){
+  const box=$('presetChips');
+  PRESETS.forEach(([name,expr,sample])=>{
+    const b=document.createElement('button');
+    b.textContent=name; b.title=expr;
+    b.onclick=()=>{ $('pattern').value=expr; if(sample) $('text').value=sample; run(); };
+    box.appendChild(b);
+  });
+})();
+
+/* 收集 flags */
+function flags(){
+  return ($('fg').checked?'g':'')+($('fi').checked?'i':'')+($('fm').checked?'m':'')+($('fs').checked?'s':'');
+}
+function buildRegex(){
+  const src=$('pattern').value;
+  const f=flags();
+  $('flagsDisp').textContent=f||' ';
+  if(!src){ $('reRow').classList.remove('err'); $('reMsg').textContent=''; $('reMsg').className='msg'; return null; }
+  try{
+    const re=new RegExp(src,f);
+    $('reRow').classList.remove('err');
+    $('reMsg').textContent='✓ 表达式有效'; $('reMsg').className='msg ok';
+    return re;
+  }catch(err){
+    $('reRow').classList.add('err');
+    $('reMsg').textContent='✗ '+err.message; $('reMsg').className='msg err';
+    return false; // 无效
+  }
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* 收集所有匹配 */
+function allMatches(re, text){
+  const res=[];
+  const g=re.global;
+  const rx = g ? re : new RegExp(re.source, re.flags+'g'); // 内部统一按 g 遍历
+  let m, guard=0;
+  rx.lastIndex=0;
+  while((m=rx.exec(text))!==null){
+    res.push({index:m.index, match:m[0], groups:m.slice(1)});
+    if(m.index===rx.lastIndex) rx.lastIndex++;
+    if(!g) break;              // 用户未开 g：只取第一个
+    if(++guard>20000) break;   // 防护
+  }
+  return res;
+}
+
+function highlight(text, matches){
+  if(!matches.length) return '<span class="empty" style="padding:0">无匹配结果</span>';
+  let html='', last=0;
+  matches.forEach(mt=>{
+    if(mt.index<last) return;
+    html+=esc(text.slice(last,mt.index));
+    html+='<mark>'+esc(mt.match||'')+'</mark>';
+    last=mt.index+(mt.match?mt.match.length:0);
+  });
+  html+=esc(text.slice(last));
+  return html;
+}
+
+function run(){
+  const re=buildRegex();
+  const text=$('text').value;
+  $('stChar').textContent=text.length;
+  // 表达式为空或无效
+  if(re===null || re===false){
+    $('hl').innerHTML='<span class="empty" style="padding:0">'+(re===false?'请修正正则表达式':'在上方输入正则与文本，匹配结果将在此高亮…')+'</span>';
+    $('list').innerHTML='<div class="empty">暂无匹配</div>';
+    $('extractOut').value=''; $('replaceOut').value='';
+    $('stMatch').textContent='0'; $('stGroup').textContent='0';
+    return;
+  }
+  const matches = text ? allMatches(re, text) : [];
+  // 统计
+  $('stMatch').textContent=matches.length;
+  $('stGroup').textContent=matches.length?matches[0].groups.length:0;
+  // 高亮
+  $('hl').innerHTML=highlight(text, matches);
+  // 列表
+  if(matches.length){
+    $('list').innerHTML=matches.map((mt,i)=>{
+      const g=mt.groups.filter(x=>x!==undefined).length
+        ? ' <span class="grp">组: '+mt.groups.map((x,j)=>'$'+(j+1)+'='+(x===undefined?'∅':x)).join('  ')+'</span>' : '';
+      return `<div class="list-item"><span class="idx">${i+1}</span><span class="val">${esc(mt.match)}</span>${g}</div>`;
+    }).join('');
+  }else{
+    $('list').innerHTML='<div class="empty">暂无匹配</div>';
+  }
+  // 提取结果
+  const useG=$('useGroup').checked;
+  $('extractOut').value=matches.map(mt=> (useG && mt.groups[0]!==undefined) ? mt.groups[0] : mt.match).join('\n');
+  // 替换
+  try{
+    const rep=$('replaceWith').value;
+    $('replaceOut').value = text.replace(re, rep);
+  }catch(e){ $('replaceOut').value=''; }
+  // 代码生成（联动）
+  generateCode();
+}
+
+['pattern','text','replaceWith'].forEach(id=>$(id).addEventListener('input',run));
+['fg','fi','fm','fs','useGroup','codeLang'].forEach(id=>$(id).addEventListener('change',run));
+
+/* ===== 代码生成（联动当前正则/文本/替换） ===== */
+function pyStr(s){ return "'"+String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'').replace(/\n/g,'\\n')+"'"; }
+function jsStr(s){ return "'"+String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'').replace(/\n/g,'\\n')+"'"; }
+function generateCode(){
+  const pat=$('pattern').value;
+  const box=$('codeOut');
+  if(!pat){ box.textContent='— 输入正则表达式后生成 —'; return; }
+  const text=$('text').value, rep=$('replaceWith').value;
+  const lang=$('codeLang').value;
+  if(lang==='python'){
+    // Python 修饰符（g 由 findall 全量匹配代替）
+    const fl=[]; if($('fi').checked)fl.push('re.I'); if($('fm').checked)fl.push('re.M'); if($('fs').checked)fl.push('re.S');
+    const flagArg = fl.length ? ', '+fl.join(' | ') : '';
+    // 原始字符串引号选择：避免与内容冲突
+    const q = pat.includes("'") && !pat.includes('"') ? '"' : "'";
+    box.textContent =
+`import re
+
+pattern = re.compile(r${q}${pat}${q}${flagArg})
+str_text = ${pyStr(text)}
+
+# 搜索第一个匹配
+match = pattern.search(str_text)
+print(match)
+
+# 获取所有匹配
+all_matches = pattern.findall(str_text)
+print(all_matches)
+
+# 替换
+result = pattern.sub(${pyStr(rep)}, str_text)
+print(result)`;
+  }else{
+    const fl=flags();
+    // 反斜杠在 JS 正则字面量里保持原样，但需转义正斜杠已由用户输入决定
+    box.textContent =
+`const pattern = /${pat}/${fl};
+const strText = ${jsStr(text)};
+
+// 获取所有匹配
+const allMatches = strText.match(pattern);
+console.log(allMatches);
+
+// 逐个遍历（含捕获组）
+for (const m of strText.matchAll(${fl.includes('g')?'pattern':'new RegExp(pattern.source, pattern.flags + "g")'})) {
+  console.log(m[0], m.slice(1));
+}
+
+// 替换
+const result = strText.replace(pattern, ${jsStr(rep)});
+console.log(result);`;
+  }
+}
+function copyText2(id){ navigator.clipboard.writeText($(id).textContent); }
+
+/* ===== 表达式生成 ===== */
+function escapeLit(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function classify(ch){
+  if(/[0-9]/.test(ch)) return 'd';
+  if(/[a-zA-Z]/.test(ch)) return 'a';
+  if(/[\u4e00-\u9fa5]/.test(ch)) return 'c';
+  if(/\s/.test(ch)) return 's';
+  return 'o';
+}
+function generalizeLine(line, exact){
+  let out='', i=0;
+  while(i<line.length){
+    const cat=classify(line[i]);
+    let j=i; while(j<line.length && classify(line[j])===cat) j++;
+    const len=j-i, seg=line.slice(i,j);
+    if(cat==='o'){ out+=escapeLit(seg); }
+    else{
+      const base = cat==='d'?'\\d' : cat==='a'?'[A-Za-z]' : cat==='c'?'[\\u4e00-\\u9fa5]' : '\\s';
+      out += base + (exact ? `{${len}}` : '+');
+    }
+    i=j;
+  }
+  return out;
+}
+let genUsesGroup=false; // 生成结果是否使用捕获组（用于提取第 1 组）
+function buildExpr(){
+  const source=$('genSource').value;
+  const target=$('genTarget').value;
+  const msg=$('genMsg');
+  const reset=()=>{ $('genOut').value=''; $('genPreview').value=''; };
+  if(!target){ reset(); msg.textContent='请先输入「需要提取的内容」'; msg.className='msg err'; return; }
+  const mode=$('genMode').value, exact=$('genExact').checked, anchor=$('genAnchor').checked, ctx=$('genCtx').value;
+  const useCtx = ctx!=='0';
+  const tp = mode==='literal' ? escapeLit(target) : generalizeLine(target, exact);
+  const grouped = useCtx ? '('+tp+')' : tp;   // 有上下文时把内容放入捕获组便于提取
+  genUsesGroup = useCtx;
+
+  const lines=source.split(/\r?\n/).filter(l=>l.trim());
+  const parts=new Set();
+  if(!useCtx || !lines.length){
+    // 无上下文，或未提供完整字符串：仅生成内容表达式
+    parts.add(grouped);
+    if(useCtx && !lines.length){ /* 有上下文但没原文，退化为仅内容 */ }
+  }else{
+    lines.forEach(line=>{
+      const idx=line.indexOf(target);
+      if(idx<0) return;
+      let before=line.slice(0,idx), after=line.slice(idx+target.length);
+      if(ctx!=='all'){ const n=parseInt(ctx,10); before=before.slice(-n); after=after.slice(0,n); }
+      parts.add(escapeLit(before)+grouped+escapeLit(after));
+    });
+    if(!parts.size){ reset(); msg.textContent='✗ 在「完整字符串」中未找到「需要提取的内容」，请检查是否一致'; msg.className='msg err'; return; }
+  }
+  const arr=[...parts];
+  let expr = arr.length>1 ? '(?:'+arr.join('|')+')' : arr[0];
+  if(anchor && !useCtx) expr='^'+expr+'$';
+  $('genOut').value=expr;
+
+  // 校验 + 提取预览
+  try{
+    const re=new RegExp(expr,'g');
+    msg.textContent = useCtx ? '✓ 表达式有效（内容位于第 1 个捕获组）' : '✓ 表达式有效';
+    msg.className='msg ok';
+    if(lines.length){
+      const out=[]; const testText=source;
+      let m,guard=0; re.lastIndex=0;
+      while((m=re.exec(testText))!==null){
+        out.push(useCtx && m[1]!==undefined ? m[1] : m[0]);
+        if(m.index===re.lastIndex) re.lastIndex++;
+        if(++guard>20000) break;
+      }
+      $('genPreview').value = out.length ? out.join('\n') : '（未从完整字符串中提取到内容，可调整选项）';
+      if(!out.length){ msg.className='msg err'; }
+    }else{
+      $('genPreview').value='（未提供完整字符串，无法预览提取效果）';
+    }
+  }catch(e){ msg.textContent='✗ '+e.message; msg.className='msg err'; $('genPreview').value=''; }
+}
+function useGenerated(){
+  const expr=$('genOut').value; if(!expr) return;
+  $('pattern').value=expr; $('fg').checked=true;
+  $('useGroup').checked=genUsesGroup;           // 若含定位捕获组，自动切到「仅输出第 1 组」
+  if($('genSource').value.trim()) $('text').value=$('genSource').value; // 顺带带入原文便于测试
+  switchTab('extract'); run();
+}
+
+/* ===== 通用 ===== */
+function copyArea(id){ const e=$(id); e.select&&e.select(); navigator.clipboard.writeText(e.value); }
+function copyText(id){ navigator.clipboard.writeText($(id).value); }
+function switchTab(p){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===p));
+  document.querySelectorAll('.pane').forEach(n=>n.classList.toggle('active',n.id===p));
+}
+
+run();
+</script>
+<script>
+window.addEventListener('message',function(e){if(e.data&&e.data.type==='yb-theme'){document.documentElement.setAttribute('data-theme',e.data.theme==='light'?'light':'dark');}});
+</script>
+</body>
+</html>

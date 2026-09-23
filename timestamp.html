@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>时间戳转换</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root[data-theme="dark"]{
+    --bg:#0d0d0d;--bg-card:#1a1a1a;--bg-card2:#222;--bg-hover:#2a2a2a;--bg-input:#111;
+    --border:#2e2e2e;--border2:#3a3a3a;--text:#f0f0f0;--text2:#999;--text3:#555;
+    --accent:#4f8ef7;--accent2:#3d7ae0;--accent-bg:rgba(79,142,247,.15);
+    --green:#4ade80;--red:#f87171;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6f9;--bg-card:#fff;--bg-card2:#f0f2f5;--bg-hover:#eef1f5;--bg-input:#fff;
+    --border:#e4e7ec;--border2:#d5d9df;--text:#1a1d21;--text2:#5c636e;--text3:#9aa1ab;
+    --accent:#2f6bef;--accent2:#2457cc;--accent-bg:rgba(47,107,239,.1);
+    --green:#16a34a;--red:#dc2626;
+  }
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;transition:background .25s,color .25s}
+  .wrap{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-size:18px;font-weight:700;margin-bottom:16px}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+  .now{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .now-label{font-size:12px;color:var(--text2)}
+  .now-val{font-size:28px;font-weight:800;font-family:"SFMono-Regular",Consolas,monospace;letter-spacing:.5px}
+  .now-unit{font-size:12px;color:var(--accent);background:var(--accent-bg);border-radius:99px;padding:2px 9px;font-weight:600}
+  .now-actions{margin-left:auto;display:flex;gap:8px}
+  button{font-size:13px;font-family:inherit;border:none;cursor:pointer;border-radius:7px;padding:7px 13px;transition:.15s;background:transparent;color:var(--text2);border:1px solid var(--border2)}
+  button:hover{background:var(--bg-hover);color:var(--text)}
+  button.p{background:var(--accent);color:#fff;border-color:transparent;font-weight:600}
+  button.p:hover{background:var(--accent2)}
+  button.stop{color:var(--red);border-color:var(--red)}
+  .tabs{display:flex;gap:6px;background:var(--bg-card2);border:1px solid var(--border);border-radius:9px;padding:4px;margin-bottom:16px}
+  .tab{flex:1;text-align:center;padding:8px;border-radius:6px;cursor:pointer;color:var(--text2);font-weight:600;font-size:13px;border:none;background:transparent}
+  .tab.active{background:var(--accent);color:#fff}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld.grow{flex:1;min-width:200px}
+  label{font-size:12px;color:var(--text2)}
+  input,select,textarea{font-family:inherit;font-size:13px;background:var(--bg-input);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  textarea{width:100%;resize:vertical;min-height:120px;font-family:"SFMono-Regular",Consolas,monospace;line-height:1.7}
+  .res{background:var(--bg-input);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;min-height:38px;font-family:"SFMono-Regular",Consolas,monospace;color:var(--green);display:flex;align-items:center;justify-content:space-between;gap:8px;word-break:break-all}
+  .res .rerr{color:var(--red)}
+  .sub{font-size:12px;color:var(--text3);margin-top:4px}
+  .pane{display:none}.pane.active{display:block}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .hr{height:1px;background:var(--border);margin:18px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>时间戳转换</h1>
+
+  <div class="card">
+    <div class="now">
+      <div>
+        <div class="now-label">当前时间戳</div>
+        <div><span id="nowVal" class="now-val">-</span> <span id="nowUnit" class="now-unit">秒</span></div>
+      </div>
+      <div class="now-actions">
+        <button onclick="toggleUnit()">切换单位</button>
+        <button onclick="copyNow()">复制</button>
+        <button id="pauseBtn" class="stop" onclick="togglePause()">暂停</button>
+      </div>
+    </div>
+    <div id="nowDate" class="sub"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-p="single" onclick="switchTab('single')">单个转换</button>
+    <button class="tab" data-p="batch" onclick="switchTab('batch')">批量转换</button>
+  </div>
+
+  <!-- 单个 -->
+  <div id="single" class="pane active">
+    <div class="grid2">
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:12px">🕒 时间戳 → 日期时间</div>
+        <div class="row">
+          <div class="fld grow"><label>时间戳</label><input id="ts" type="text" placeholder="如 1790069558" /></div>
+          <div class="fld"><label>单位</label>
+            <select id="tsUnit"><option value="s">秒 (s)</option><option value="ms">毫秒 (ms)</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="fld grow"><label>时区</label><select id="tzA"></select></div>
+          <div class="fld"><label>&nbsp;</label><button onclick="fillNowTs()">填入当前</button></div>
+          <div class="fld"><label>&nbsp;</label><button class="p" onclick="ts2date()">转换</button></div>
+        </div>
+        <label>转换结果</label>
+        <div class="res"><span id="ts2dateOut">—</span><button onclick="copyEl('ts2dateOut')">复制</button></div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:12px">📅 日期时间 → 时间戳</div>
+        <div class="row">
+          <div class="fld grow"><label>日期时间</label><input id="dt" type="text" placeholder="YYYY-MM-DD HH:mm:ss" /></div>
+        </div>
+        <div class="row">
+          <div class="fld grow"><label>时区</label><select id="tzB"></select></div>
+          <div class="fld"><label>输出单位</label>
+            <select id="outUnit"><option value="s">秒 (s)</option><option value="ms">毫秒 (ms)</option></select>
+          </div>
+          <div class="fld"><label>&nbsp;</label><button onclick="fillNowDt()">填入当前</button></div>
+          <div class="fld"><label>&nbsp;</label><button class="p" onclick="date2ts()">转换</button></div>
+        </div>
+        <label>转换结果</label>
+        <div class="res"><span id="date2tsOut">—</span><button onclick="copyEl('date2tsOut')">复制</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 批量 -->
+  <div id="batch" class="pane">
+    <div class="card">
+      <div class="row">
+        <div class="fld"><label>方向</label>
+          <select id="batchMode">
+            <option value="t2d">时间戳 → 日期</option>
+            <option value="d2t">日期 → 时间戳</option>
+          </select>
+        </div>
+        <div class="fld"><label>时间戳单位</label>
+          <select id="batchUnit"><option value="s">秒 (s)</option><option value="ms">毫秒 (ms)</option></select>
+        </div>
+        <div class="fld grow"><label>时区</label><select id="tzC"></select></div>
+        <div class="fld"><label>&nbsp;</label><button class="p" onclick="batchRun()">批量转换</button></div>
+        <div class="fld"><label>&nbsp;</label><button onclick="copyEl('batchOut',true)">复制结果</button></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>输入（每行一个）</label><textarea id="batchIn" spellcheck="false" placeholder="每行一个值，例如：&#10;1790069558&#10;1790155958"></textarea></div>
+        <div class="fld"><label>输出</label><textarea id="batchOut" spellcheck="false" readonly></textarea></div>
+      </div>
+      <div class="sub">日期→时间戳 时，输入格式支持 <code>YYYY-MM-DD HH:mm:ss</code> 或 <code>YYYY-MM-DD</code>。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.getElementById(s);
+// 固定偏移时区（避免 DST 歧义，开发够用）
+const ZONES=[["UTC+8 (北京/上海)",8],["UTC+0 (伦敦)",0],["UTC+9 (东京/首尔)",9],["UTC+7 (曼谷)",7],["UTC+1 (柏林/巴黎)",1],["UTC-5 (纽约)",-5],["UTC-8 (洛杉矶)",-8],["UTC+5.5 (印度)",5.5],["UTC+10 (悉尼)",10],["UTC-3 (圣保罗)",-3]];
+["tzA","tzB","tzC"].forEach(id=>{const s=$(id);ZONES.forEach(([label,off])=>{const o=document.createElement('option');o.value=off;o.textContent=label;s.appendChild(o);});});
+
+const pad=n=>String(n).padStart(2,'0');
+// epoch(秒) + 偏移 → 格式化字符串
+function fmt(epochSec,offsetHours){
+  const d=new Date((epochSec+offsetHours*3600)*1000);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+// 解析 "YYYY-MM-DD[ HH:mm[:ss]]" 在指定偏移时区 → epoch(秒)
+function parseToEpoch(str,offsetHours){
+  const m=str.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if(!m) return null;
+  const [_,Y,Mo,D,H,Mi,S]=m;
+  const utc=Date.UTC(+Y,+Mo-1,+D,+(H||0),+(Mi||0),+(S||0));
+  return Math.floor(utc/1000)-offsetHours*3600;
+}
+
+/* 当前时间戳 */
+let unitMs=false, paused=false;
+function tick(){ if(paused)return; const now=Date.now(); $('nowVal').textContent=unitMs?now:Math.floor(now/1000); $('nowDate').textContent='本地时间：'+fmt(Math.floor(now/1000), -new Date().getTimezoneOffset()/60); }
+setInterval(tick,1000); tick();
+function toggleUnit(){ unitMs=!unitMs; $('nowUnit').textContent=unitMs?'毫秒':'秒'; tick(); }
+function togglePause(){ paused=!paused; const b=$('pauseBtn'); b.textContent=paused?'继续':'暂停'; b.classList.toggle('stop',!paused); }
+function copyNow(){ navigator.clipboard.writeText($('nowVal').textContent); }
+
+/* 单个转换 */
+function ts2date(){
+  const raw=$('ts').value.trim(); const out=$('ts2dateOut');
+  if(!/^-?\d+$/.test(raw)){ out.className='rerr'; out.textContent='请输入纯数字时间戳'; return; }
+  let sec=parseInt(raw,10); if($('tsUnit').value==='ms') sec=Math.floor(sec/1000);
+  out.className=''; out.textContent=fmt(sec, parseFloat($('tzA').value));
+}
+function date2ts(){
+  const out=$('date2tsOut'); const ep=parseToEpoch($('dt').value, parseFloat($('tzB').value));
+  if(ep===null){ out.className='rerr'; out.textContent='格式应为 YYYY-MM-DD HH:mm:ss'; return; }
+  out.className=''; out.textContent = $('outUnit').value==='ms' ? ep*1000 : ep;
+}
+function fillNowTs(){ $('ts').value=Math.floor(Date.now()/1000); $('tsUnit').value='s'; ts2date(); }
+function fillNowDt(){ const off=parseFloat($('tzB').value); $('dt').value=fmt(Math.floor(Date.now()/1000),off); date2ts(); }
+
+/* 批量 */
+function batchRun(){
+  const lines=$('batchIn').value.split(/\r?\n/);
+  const mode=$('batchMode').value, unit=$('batchUnit').value;
+  const off=parseFloat($('tzC').value);
+  const res=lines.map(line=>{
+    const t=line.trim(); if(!t) return '';
+    if(mode==='t2d'){
+      if(!/^-?\d+$/.test(t)) return '✗ 非数字';
+      let sec=parseInt(t,10); if(unit==='ms') sec=Math.floor(sec/1000);
+      return fmt(sec,off);
+    }else{
+      const ep=parseToEpoch(t,off);
+      if(ep===null) return '✗ 格式错误';
+      return unit==='ms'?ep*1000:ep;
+    }
+  });
+  $('batchOut').value=res.join('\n');
+}
+
+/* 通用复制/切页 */
+function copyEl(id,isArea){ const e=$(id); navigator.clipboard.writeText(isArea?e.value:e.textContent); }
+function switchTab(p){ document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===p)); document.querySelectorAll('.pane').forEach(n=>n.classList.toggle('active',n.id===p)); }
+
+/* 预填当前时间 */
+fillNowTs(); fillNowDt();
+</script>
+<script>
+window.addEventListener('message',function(e){if(e.data&&e.data.type==='yb-theme'){document.documentElement.setAttribute('data-theme',e.data.theme==='light'?'light':'dark');}});
+</script>
+</body>
+</html>

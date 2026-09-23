@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>随机字符串生成</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root[data-theme="dark"]{
+    --bg:#0d0d0d;--bg-card:#1a1a1a;--bg-card2:#222;--bg-hover:#2a2a2a;--bg-input:#111;
+    --border:#2e2e2e;--border2:#3a3a3a;--text:#f0f0f0;--text2:#999;--text3:#555;
+    --accent:#4f8ef7;--accent2:#3d7ae0;--accent-bg:rgba(79,142,247,.15);
+    --green:#4ade80;--red:#f87171;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6f9;--bg-card:#fff;--bg-card2:#f0f2f5;--bg-hover:#eef1f5;--bg-input:#fff;
+    --border:#e4e7ec;--border2:#d5d9df;--text:#1a1d21;--text2:#5c636e;--text3:#9aa1ab;
+    --accent:#2f6bef;--accent2:#2457cc;--accent-bg:rgba(47,107,239,.1);
+    --green:#16a34a;--red:#dc2626;
+  }
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;transition:background .25s,color .25s}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-size:18px;font-weight:700;margin-bottom:16px}
+  .layout{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.layout{grid-template-columns:1fr}}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px}
+  .ctitle{font-size:15px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+  label{font-size:12px;color:var(--text2)}
+  /* 长度 */
+  .len-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .len-head .lbl{font-size:13px;color:var(--text)}
+  .len-val{font-family:Consolas,monospace;font-size:14px;font-weight:700;background:var(--bg-card2);border:1px solid var(--border);border-radius:7px;padding:4px 12px;min-width:52px;text-align:center}
+  input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+  .len-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:2px}
+  .sect-lbl{font-size:12px;color:var(--text2);margin:20px 0 10px}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);cursor:pointer}
+  .chk input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .opts-col{display:flex;flex-direction:column;gap:12px}
+  .gen-btn{margin-top:22px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:9px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  .gen-btn:hover{background:var(--accent2)}
+  /* 结果 */
+  .result-box{position:relative;background:var(--bg-input);border:1px solid var(--border2);border-radius:9px;padding:14px 48px 14px 14px;font-family:"SFMono-Regular",Consolas,monospace;font-size:15px;word-break:break-all;min-height:52px;color:var(--green)}
+  .copy-btn{position:absolute;top:8px;right:8px;background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:7px;width:34px;height:34px;cursor:pointer;font-size:15px;transition:.15s}
+  .copy-btn:hover{background:var(--bg-hover);color:var(--text)}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+  .info-cell{background:var(--bg-card2);border:1px solid var(--border);border-radius:9px;padding:11px 14px}
+  .info-cell .k{font-size:11px;color:var(--text3);margin-bottom:3px}
+  .info-cell .v{font-size:13px;font-weight:600}
+  .recent-head{display:flex;align-items:center;justify-content:space-between;margin:22px 0 10px}
+  .recent-head .lbl{font-size:12px;color:var(--text2)}
+  .clear-btn{background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px}
+  .clear-btn:hover{color:var(--red)}
+  .recent-item{display:flex;align-items:center;gap:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-bottom:8px}
+  .recent-item .rv{flex:1;font-family:"SFMono-Regular",Consolas,monospace;font-size:13px;word-break:break-all;color:var(--text)}
+  .recent-item .rlen{font-size:11px;color:var(--text3);white-space:nowrap}
+  .recent-item .ric{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:14px}
+  .recent-item .ric:hover{color:var(--accent)}
+  .empty{color:var(--text3);font-size:12.5px;padding:8px 0}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--accent);color:#fff;padding:9px 18px;border-radius:9px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>生成随机字符串</h1>
+  <div class="layout">
+    <!-- 左：生成选项 -->
+    <div class="card">
+      <div class="ctitle">⚙️ 生成选项</div>
+
+      <div class="len-head">
+        <span class="lbl">长度: <span id="lenLabel">16</span></span>
+        <span class="len-val" id="lenVal">16</span>
+      </div>
+      <input id="len" type="range" min="4" max="128" value="16" />
+      <div class="len-scale"><span>4</span><span>64</span><span>128</span></div>
+
+      <div class="sect-lbl">包含字符：</div>
+      <div class="opts">
+        <label class="chk"><input id="lower" type="checkbox" checked /> 小写字母 (a-z)</label>
+        <label class="chk"><input id="upper" type="checkbox" checked /> 大写字母 (A-Z)</label>
+        <label class="chk"><input id="digit" type="checkbox" checked /> 数字 (0-9)</label>
+        <label class="chk"><input id="symbol" type="checkbox" checked /> 符号 (!@#$%)</label>
+      </div>
+
+      <div class="sect-lbl">选项：</div>
+      <div class="opts-col">
+        <label class="chk"><input id="autoGen" type="checkbox" /> 更改时自动生成</label>
+        <label class="chk"><input id="noSimilar" type="checkbox" checked /> 排除相似字符 (如 1, l, I, 0, O)</label>
+      </div>
+
+      <button class="gen-btn" onclick="generate()">⚡ 生成随机字符串</button>
+    </div>
+
+    <!-- 右：结果 -->
+    <div class="card">
+      <div class="ctitle">🔑 生成结果</div>
+
+      <label>生成的字符串：</label>
+      <div class="result-box" style="margin-top:6px">
+        <span id="result">—</span>
+        <button class="copy-btn" title="复制" onclick="copyResult()">⧉</button>
+      </div>
+
+      <div class="sect-lbl" style="margin-top:16px">信息：</div>
+      <div class="info">
+        <div class="info-cell"><div class="k">长度</div><div class="v" id="infoLen">—</div></div>
+        <div class="info-cell"><div class="k">类型</div><div class="v" id="infoType">—</div></div>
+      </div>
+
+      <div class="recent-head">
+        <span class="lbl">最近生成：</span>
+        <button class="clear-btn" onclick="clearRecent()">🗑 清除</button>
+      </div>
+      <div id="recent"><div class="empty">暂无生成记录</div></div>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const $=s=>document.getElementById(s);
+const SIMILAR='il1Lo0O';
+const POOLS={
+  lower:'abcdefghijklmnopqrstuvwxyz',
+  upper:'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  digit:'0123456789',
+  symbol:'!@#$%^&*()-_=+[]{}',
+};
+const TYPE_LABEL={lower:'小写字母',upper:'大写字母',digit:'数字',symbol:'符号'};
+
+let recent=[];
+
+/* 长度滑块 */
+$('len').addEventListener('input',()=>{
+  const v=$('len').value; $('lenVal').textContent=v; $('lenLabel').textContent=v;
+  autoMaybe();
+});
+/* 选项改变 */
+['lower','upper','digit','symbol','noSimilar'].forEach(id=>$(id).addEventListener('change',autoMaybe));
+function autoMaybe(){ if($('autoGen').checked) generate(); }
+
+/* 加密安全随机整数 [0,max) */
+function randInt(max){
+  const buf=new Uint32Array(1); const limit=Math.floor(4294967296/max)*max;
+  let x; do{ crypto.getRandomValues(buf); x=buf[0]; }while(x>=limit);
+  return x%max;
+}
+function pick(str){ return str[randInt(str.length)]; }
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){ const j=randInt(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+
+function selectedTypes(){
+  return ['lower','upper','digit','symbol'].filter(id=>$(id).checked);
+}
+
+function generate(){
+  const types=selectedTypes();
+  if(!types.length){ toast('请至少选择一种字符类型'); return; }
+  const noSim=$('noSimilar').checked;
+  // 组装可用池
+  const pools=types.map(t=>{
+    let p=POOLS[t];
+    if(noSim) p=[...p].filter(c=>!SIMILAR.includes(c)).join('');
+    return {t,p};
+  }).filter(x=>x.p.length);
+  if(!pools.length){ toast('排除相似字符后无可用字符'); return; }
+
+  const len=parseInt($('len').value,10);
+  const all=pools.map(x=>x.p).join('');
+  const chars=[];
+  // 保证每种已选类型至少 1 个（长度足够时）
+  pools.forEach(x=>{ if(chars.length<len) chars.push(pick(x.p)); });
+  while(chars.length<len) chars.push(pick(all));
+  const str=shuffle(chars).slice(0,len).join('');
+
+  $('result').textContent=str;
+  $('infoLen').textContent=len+' 字符';
+  $('infoType').textContent=types.map(t=>TYPE_LABEL[t]).join(' + ');
+
+  recent.unshift({str,len});
+  if(recent.length>10) recent.pop();
+  renderRecent();
+}
+
+function renderRecent(){
+  const box=$('recent');
+  if(!recent.length){ box.innerHTML='<div class="empty">暂无生成记录</div>'; return; }
+  box.innerHTML=recent.map((r,i)=>
+    `<div class="recent-item"><span class="rv">${escapeHtml(r.str)}</span><span class="rlen">${r.len} 位</span><button class="ric" title="复制" onclick="copyRecent(${i})">⧉</button></div>`
+  ).join('');
+}
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function copyResult(){
+  const v=$('result').textContent; if(!v||v==='—') return;
+  navigator.clipboard.writeText(v); toast('已复制');
+}
+function copyRecent(i){ navigator.clipboard.writeText(recent[i].str); toast('已复制'); }
+function clearRecent(){ recent=[]; renderRecent(); }
+
+/* toast */
+let toastTimer;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1500);
+}
+
+generate();
+</script>
+<script>
+window.addEventListener('message',function(e){if(e.data&&e.data.type==='yb-theme'){document.documentElement.setAttribute('data-theme',e.data.theme==='light'?'light':'dark');}});
+</script>
+</body>
+</html>
