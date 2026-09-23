@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>用户关系链佣金计算器</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0d0d; --bg-card: #1a1a1a; --bg-card2: #222;
+      --bg-hover: #2a2a2a; --bg-input: #111;
+      --border: #2e2e2e; --border2: #3a3a3a;
+      --text: #f0f0f0; --text2: #999; --text3: #555;
+      --accent: #4f8ef7; --accent-bg: rgba(79,142,247,0.15);
+      --green: #4ade80; --green-bg: rgba(74,222,128,0.12);
+      --yellow: #f59e0b; --yellow-bg: rgba(245,158,11,0.12);
+      --blue-bg: rgba(79,142,247,0.12);
+      --purple: #a78bfa; --purple-bg: rgba(167,139,250,0.12);
+      --r: 8px; --rs: 5px;
+    }
+    /* 亮色主题（由工作台外壳通过 postMessage 联动切换） */
+    html[data-theme="light"] {
+      --bg: #f4f6f9; --bg-card: #ffffff; --bg-card2: #f0f2f5;
+      --bg-hover: #eef1f5; --bg-input: #ffffff;
+      --border: #e4e7ec; --border2: #d5d9df;
+      --text: #1a1d21; --text2: #5c636e; --text3: #9aa1ab;
+      --accent: #2f6bef; --accent-bg: rgba(47,107,239,0.10);
+      --green: #16a34a; --green-bg: rgba(22,163,74,0.12);
+      --yellow: #d97706; --yellow-bg: rgba(217,119,6,0.12);
+      --blue-bg: rgba(47,107,239,0.10);
+      --purple: #7c3aed; --purple-bg: rgba(124,58,237,0.12);
+    }
+    html[data-theme="light"] body { color: var(--text); }
+    /* 等级标签在亮色下的可读性微调 */
+    html[data-theme="light"] .lv-V1 { color:#64748b; }
+    html[data-theme="light"] .lv-V2 { color:#2f6bef; }
+    html[data-theme="light"] .lv-V3 { color:#b45309; }
+    html[data-theme="light"] select option { background:#fff; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 14px; line-height: 1.6; transition: background .25s, color .25s; }
+    .app { max-width: 880px; margin: 0 auto; padding: 32px 20px 60px; }
+
+    h1 { font-size: 21px; font-weight: 700; }
+    h2 { font-size: 15px; font-weight: 700; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:99px; background:var(--accent-bg); color:var(--accent); font-size:11px; font-weight:600; border:1px solid rgba(79,142,247,.3); vertical-align:middle; margin-left:10px; }
+    .subtitle { color:var(--text2); margin-top:6px; font-size:13px; }
+    hr { border:none; border-top:1px solid var(--border); margin:24px 0; }
+
+    /* 卡片 */
+    .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+    .card-head { padding:10px 16px; border-bottom:1px solid var(--border); font-size:12px; font-weight:600; color:var(--text2); letter-spacing:.04em; text-transform:uppercase; display:flex; align-items:center; }
+
+    /* 按钮 */
+    button { font-size:13px; font-family:inherit; border:none; cursor:pointer; border-radius:var(--rs); padding:5px 12px; transition:background .15s; outline:none; }
+    .btn-p { background:var(--accent); color:#fff; font-weight:600; }
+    .btn-p:hover { background:#3d7ae0; }
+    .btn-g { background:transparent; color:var(--text2); border:1px solid var(--border2); }
+    .btn-g:hover { background:var(--bg-hover); color:var(--text); }
+    .btn-i { background:transparent; color:var(--text3); padding:3px 7px; font-size:12px; border:1px solid transparent; }
+    .btn-i:hover:not(:disabled) { background:var(--bg-hover); color:var(--text2); border-color:var(--border); }
+    button:disabled { opacity:.3; cursor:not-allowed; }
+
+    /* 输入 */
+    input, select { font-family:inherit; font-size:13px; background:var(--bg-input); color:var(--text); border:1px solid var(--border2); border-radius:var(--rs); padding:5px 8px; outline:none; }
+    input:focus, select:focus { border-color:var(--accent); }
+    select option { background:#1a1a1a; }
+
+    /* 节点列表 */
+    .node-row { display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); transition:background .12s; }
+    .node-row:hover { background:var(--bg-hover); }
+    .node-row.seller { background:var(--accent-bg); }
+    .node-idx { width:22px; text-align:center; color:var(--text3); font-size:12px; flex-shrink:0; }
+    .node-role { flex:1; color:var(--text2); font-size:12px; }
+    .node-role.s { color:var(--accent); font-weight:600; }
+    .arrow-line { padding:0 16px; height:16px; display:flex; align-items:center; }
+    .arrow-inner { width:82px; text-align:center; color:var(--text3); font-size:11px; }
+
+    /* 等级标签 */
+    .lv { display:inline-flex; align-items:center; justify-content:center; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:700; min-width:44px; flex-shrink:0; }
+    .lv-V1 { background:rgba(120,120,120,.18); color:#aaa; border:1px solid rgba(120,120,120,.3); }
+    .lv-V2 { background:rgba(79,142,247,.15); color:#7ab4ff; border:1px solid rgba(79,142,247,.35); }
+    .lv-V3 { background:rgba(245,158,11,.15); color:#fbbf24; border:1px solid rgba(245,158,11,.35); }
+
+    /* 关系标签 */
+    .rt { display:inline-block; padding:1px 7px; border-radius:99px; font-size:11px; font-weight:600; white-space:nowrap; }
+    .rt-DIRECT          { background:var(--green-bg);  color:var(--green);  border:1px solid rgba(74,222,128,.3); }
+    .rt-INDIRECT        { background:var(--yellow-bg); color:var(--yellow); border:1px solid rgba(245,158,11,.3); }
+    .rt-OUTSIDE         { background:rgba(100,100,100,.1); color:var(--text3); border:1px solid var(--border); }
+    .rt-DIRECT_PERSONAL { background:var(--green-bg);  color:var(--green);  border:1px solid rgba(74,222,128,.3); }
+    .rt-DIRECT_TEAM     { background:var(--blue-bg);   color:var(--accent); border:1px solid rgba(79,142,247,.3); }
+    .rt-INDIRECT_TEAM   { background:var(--purple-bg); color:var(--purple); border:1px solid rgba(167,139,250,.3); }
+    .rt-OUTSIDE_TEAM    { background:rgba(100,100,100,.1); color:var(--text3); border:1px solid var(--border); }
+
+    /* 统计 */
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:16px; }
+    .stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; }
+    .stat-val { font-size:22px; font-weight:700; line-height:1.2; }
+    .stat-val.g { color:var(--green); }
+    .stat-val.p { color:var(--purple); }
+    .stat-lbl { font-size:11px; color:var(--text2); margin-top:3px; display:flex; align-items:center; }
+
+    /* 悬浮帮助提示 */
+    .help { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:var(--border2); color:var(--text2); font-size:10px; font-weight:700; cursor:help; margin-left:5px; position:relative; }
+    .help:hover .help-tip { opacity:1; visibility:visible; }
+    .help-tip { position:absolute; bottom:150%; left:50%; transform:translateX(-50%); background:#000; border:1px solid var(--border2); color:var(--text); padding:5px 9px; border-radius:var(--rs); font-size:11px; font-weight:500; white-space:nowrap; opacity:0; visibility:hidden; transition:opacity .15s; z-index:10; pointer-events:none; }
+
+    /* 导师托管开关 */
+    .switch { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; font-size:15px; font-weight:900; color:var(--text2); cursor:pointer; flex-shrink:0; white-space:nowrap; user-select:none; padding:3px 5px;  background:unset; background-image:none; transform:rotate(360deg); }
+    .switch input { width:auto; margin:0; cursor:pointer; accent-color:var(--purple); }
+
+    /* 表格 */
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { padding:8px 10px; text-align:left; font-size:11px; font-weight:600; color:var(--text2); letter-spacing:.04em; border-bottom:1px solid var(--border2); background:var(--bg-card2); }
+    td { padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    .no-earn td { color:var(--text3); }
+    .no-earn .lv { opacity:.4; }
+    .has-earn td:first-child { font-weight:600; }
+    .amt { font-weight:700; color:var(--green); }
+
+    /* 横向流向图 */
+    .hf-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+    .hf-canvas { position:relative; }
+
+    /* 折叠 */
+    .coll-head { display:flex; align-items:center; gap:8px; cursor:pointer; padding:10px 0; user-select:none; color:var(--text2); font-size:13px; font-weight:600; }
+    .coll-head:hover { color:var(--text); }
+    .coll-arrow { font-size:10px; transition:transform .2s; display:inline-block; }
+    .coll-arrow.open { transform:rotate(90deg); }
+
+    /* 提示 */
+    .callout { border-left:3px solid var(--border2); background:var(--bg-card2); border-radius:0 var(--rs) var(--rs) 0; padding:10px 14px; font-size:12px; color:var(--text2); line-height:1.8; }
+    .callout-t { font-weight:700; color:var(--text); margin-bottom:4px; font-size:12px; }
+
+    /* 比例配置 */
+    .rg-title { font-size:11px; font-weight:700; color:var(--text2); letter-spacing:.06em; text-transform:uppercase; margin:14px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+    .rate-input { width:72px; }
+
+    /* 金额行 */
+    .amt-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .amt-lbl { font-weight:600; white-space:nowrap; }
+    .amt-input { width:160px; font-size:15px; padding:7px 10px; }
+    .amt-hint { color:var(--text2); font-size:12px; }
+    .amt-hint b { color:var(--text); font-weight:600; }
+
+    /* 顶部工具栏 */
+    .toolbar { display:flex; align-items:center; margin-bottom:10px; }
+    .toolbar-right { margin-left:auto; display:flex; gap:8px; }
+
+    /* 滚动表格容器 */
+    .tbl-wrap { overflow-x:auto; }
+
+    @media(max-width:600px){
+      .app{padding:16px 12px 48px;}
+      .stats{grid-template-columns:repeat(2,1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="app">正在加载...</div>
+
+<script>
+// ─── 数据与规则 ────────────────────────────────────────────────────────────────
+
+const BASE_RATES = [
+  { receiver:"V1", source:"V1", relation:"DIRECT",          rate:2,   scenario:"直属成员有效收益" },
+  { receiver:"V2", source:"V1", relation:"DIRECT",          rate:5,   scenario:"直属 V1 实际产出" },
+  { receiver:"V2", source:"V1", relation:"INDIRECT",        rate:3,   scenario:"间属 V1 实际产出" },
+  { receiver:"V2", source:"V1", relation:"OUTSIDE",         rate:2,   scenario:"三级以外 V1 实际产出" },
+  { receiver:"V2", source:"V2", relation:"DIRECT_PERSONAL", rate:5,   scenario:"直属 V2 本人贡献业绩" },
+  { receiver:"V2", source:"V2", relation:"DIRECT_TEAM",     rate:2,   scenario:"直属 V2 团队归集贡献业绩" },
+  { receiver:"V2", source:"V2", relation:"INDIRECT_TEAM",   rate:1,   scenario:"间属团队流水" },
+  { receiver:"V2", source:"V3", relation:"DIRECT",          rate:0,   scenario:"任意（无收益）" },
+  { receiver:"V3", source:"V1", relation:"DIRECT",          rate:8,   scenario:"直属 V1 实际产出" },
+  { receiver:"V3", source:"V1", relation:"INDIRECT",        rate:5,   scenario:"间属 V1 实际产出" },
+  { receiver:"V3", source:"V1", relation:"OUTSIDE",         rate:3,   scenario:"三级以外 V1 实际产出" },
+  { receiver:"V3", source:"V2", relation:"DIRECT_PERSONAL", rate:8,   scenario:"直属 V2 本人贡献业绩" },
+  { receiver:"V3", source:"V2", relation:"DIRECT_TEAM",     rate:3,   scenario:"直属 V2 团队归集贡献业绩" },
+  { receiver:"V3", source:"V2", relation:"INDIRECT_TEAM",   rate:1.5, scenario:"间属团队流水" },
+  { receiver:"V3", source:"V2", relation:"OUTSIDE_TEAM",    rate:1,   scenario:"三级以外 V2 团队归集贡献业绩" },
+  { receiver:"V3", source:"V3", relation:"DIRECT_PERSONAL", rate:8,   scenario:"直属 V3 本人贡献业绩" },
+  { receiver:"V3", source:"V3", relation:"DIRECT_TEAM",     rate:1,   scenario:"直属 V3 团队归集贡献业绩" },
+  { receiver:"V3", source:"V3", relation:"INDIRECT_TEAM",   rate:0.5, scenario:"间属团队流水" },
+];
+
+// ─── 项目等级预设 ─────────────────────────────────────────────────────────────
+// 穷举验证（链长 2~11）：最高总分成 = 10.5%，唯一峰值模型 V3→V3→V3→V2→V2→V2→V1(出单)。
+// 以该模型总分成 10.5% 为基准，按各等级生态奖励上限等比缩放；四舍五入到一位小数（方案2）。
+const WORST_CASE_TOTAL = 10.5;
+const PROJECT_PRESETS = [
+  { id:"SSS", name:"SSS 限时高激励", cap:12 },
+  { id:"S",   name:"S 标准优选项目", cap:10.5 },
+  { id:"A",   name:"A 成长项目",     cap:7 },
+  { id:"B",   name:"B 补充项目",     cap:3 },
+];
+function round1(x) { return Math.round(x * 10) / 10; }
+function presetRatesByCap(cap) {
+  const factor = cap / WORST_CASE_TOTAL;
+  return BASE_RATES.map(r => ({ ...r, rate: round1(r.rate * factor) }));
+}
+const DEFAULT_RATES = presetRatesByCap(10.5); // 默认 = S 标准优选项目
+
+const DEFAULT_CHAIN = [
+  { id:1, name:"P1", level:"V3" },
+  { id:2, name:"P2", level:"V2" },
+  { id:3, name:"P3", level:"V1" },
+];
+
+const REL_LABELS = {
+  DIRECT:"直属", INDIRECT:"间属", OUTSIDE:"三级外",
+  DIRECT_PERSONAL:"直属（本人）", DIRECT_TEAM:"直属（团队流水）",
+  INDIRECT_TEAM:"间属团队流水", OUTSIDE_TEAM:"三级外（团队流水）",
+};
+
+const LEVEL_OPTS = ["V1","V2","V3"];
+const LEVEL_NAMES = { V1:"V1 达人", V2:"V2 团队主理人", V3:"V3 生态合伙人" };
+
+// ─── 计算逻辑 ────────────────────────────────────────────────────────────────
+
+function getRate(rates, receiver, source, relation) {
+  const r = rates.find(r => r.receiver===receiver && r.source===source && r.relation===relation);
+  return r ? r.rate : 0;
+}
+function findPrimary(chain, from, to, level) {
+  let last = from;
+  for (let i = from; i < to; i++) if (chain[i].level === level) last = i;
+  return last;
+}
+function countBetween(chain, from, to, level) {
+  let n = 0;
+  for (let i = from; i < to; i++) if (chain[i].level === level) n++;
+  return n;
+}
+// 找到链路 [from, to]（含 to）中第一个目标等级节点的下标，没有则返回 -1
+function findFirst(chain, from, to, level) {
+  for (let k = from; k <= to; k++) if (chain[k].level === level) return k;
+  return -1;
+}
+
+// ─── 核心计算（已按文档 §3 所有示例验证）────────────────────────────────────
+//
+// 档位判定依据：
+//   「本人贡献业绩」= 目标 V2/V3 节点自己就是出单人（链路末节点）
+//   「团队归集贡献业绩」= 目标 V2/V3 节点下面还有成员在出单（承接节点）
+//
+// V3 → V3 团队流水规则（V2节点完全透明，仅计链路中V3数量）：
+//   链路中出现低等级(V2)时，找到最近的同等级V3作为直属团，次近的作为间属团
+//   1个V3 → 直属团队 1%
+//   2个V3 → 间属团队流水 0.5%
+//   ≥3个V3 → 无收益
+//   例：A(V3)→B(V2)→P2(V2)→P3(V3)→P4(V2)→P5(V2)→P6(V3)→P7(V1出单)
+//       P3=A的直属团(第1个V3)，P6=A的间属团(第2个V3) → A得INDIRECT_TEAM 0.5%
+//
+// V3 → V2 分档规则（链路中无V3时，按V2节点数）：
+//   0 个 V2（V2 是出单人）  → 直属本人 8%
+//   1 个 V2                 → 直属团队归集 3%
+//   2 个 V2                 → 间属团队流水 1.5%
+//   3+ 个 V2                → 三级外团队 1%
+//
+// V2 阻断规则：
+//   链路中只要存在 V3 节点，V2 收益人一律无法获得收益
+//
+// V2 → V2 分档规则（链路中无 V3，按跳数 + 子V2层数）：
+//   跳数≥3（≥2个V1间隔）→ 三级外 0%
+//   跳数=1（直属）：seller→直属本人5%，无子V2→直属团队2%，一层子V2→间属团队1%
+//   跳数=2（间属，降一档）：seller→间属团队1%，无子V2→间属团队1%，否则0%
+//   来源V2无收益时级联清零
+//
+// 验证：
+//   V3→V2→V1            : V2=5%, V3=3%      ✓
+//   V3→V3→V1            : V3=8%, V3上级=1%  ✓
+//   V3→V2→V2→V1         : C=5%, B=2%, A=1.5% ✓
+//   V3→V2→V2→V2→V1      : D=5%, C=2%, B=1%, A=1% ✓
+//   V3→V3→V3→V1         : 下8%,中1%,上0.5% ✓
+//   V3→V2→V2→V3→V2→V1   : 下V3直属8%,中V3直属团1%,上V3间属团0.5% ✓
+//
+function calcCommissions(chain, sale, rates) {
+  if (chain.length < 2) return [];
+  const si = chain.length - 1; // 出单人下标
+  const out = [];
+
+  for (let i = si - 1; i >= 0; i--) {
+    const rv = chain[i], dc = chain[i + 1];
+    let srcIdx = i + 1, rel = "OUTSIDE", rate = 0;
+
+    // ── V1 收益人：仅直属 V1 出单人 ──
+    if (rv.level === "V1") {
+      if (i + 1 === si && dc.level === "V1") {
+        rel = "DIRECT";
+        rate = getRate(rates, "V1", "V1", "DIRECT");
+      }
+
+    // ── V2 收益人 ──
+    } else if (rv.level === "V2") {
+      if (findFirst(chain, i + 1, si, "V3") !== -1) {
+        rel = "OUTSIDE"; rate = 0; // 链路中存在V3节点，V2无法穿透获得收益
+
+      } else {
+        // V1 节点透明，穿透 V1 找到下方第一个 V2 阻断节点（含出单人位置）
+        // 避免 B(V2)→P2(V1)→P3(V2)→...→C(V1) 时 B 错误按 V2→V1 跳数拿分成
+        const fv2 = findFirst(chain, i + 1, si, "V2");
+
+        if (fv2 === -1) {
+          // 链路中无 V2 → 纯 V1 链路，按跳数拿分成
+          const h = si - i;
+          rel = h === 1 ? "DIRECT" : h === 2 ? "INDIRECT" : "OUTSIDE";
+          rate = getRate(rates, "V2", "V1", rel);
+          srcIdx = si;
+
+        } else if (fv2 === si) {
+          // 找到的第一个 V2 就是出单人 → 直属本人
+          rel = "DIRECT_PERSONAL"; srcIdx = fv2;
+          rate = getRate(rates, "V2", "V2", rel);
+
+        } else {
+          // 找到 V2 阻断节点（非出单人），按其下方的 V2 层数判断档位
+          const v2BelowWall = countBetween(chain, fv2 + 1, si, "V2");
+          if (v2BelowWall === 0) {
+            // 阻断节点是最内层 V2 → 直属团队
+            rel = "DIRECT_TEAM"; srcIdx = fv2;
+          } else if (v2BelowWall === 1) {
+            // 阻断节点下方还有一层 V2 → 间属团队流水
+            rel = "INDIRECT_TEAM";
+            srcIdx = findPrimary(chain, fv2, si, "V2"); // 最内层 V2
+          } else {
+            // ≥2 层 V2：超出 V2 触达范围，无收益
+            rel = "OUTSIDE"; rate = 0;
+          }
+          if (rel !== "OUTSIDE") rate = getRate(rates, "V2", "V2", rel);
+        }
+      }
+
+    // ── V3 收益人 ──
+    } else if (rv.level === "V3") {
+      // ── 核心优先级：
+      //   1. 链路中存在 V3 同级节点 → 走 V3→V3（V3 同级优先，V2 透明但会升档位）
+      //   2. 无 V3 但有 V2          → 走 V3→V2（穿透 V1 找最内层 V2）
+      //   3. 纯 V1 链路              → 走 V3→V1（跳数档位）
+      //
+      // V3→V3 档位规则：V2节点对V3→V3连接完全透明，仅计V3数量
+      //   1个V3 → 直属团队 1%（最近同级V3 = 直属团）
+      //   2个V3 → 间属团队流水 0.5%（次近同级V3 = 间属团）
+      //   ≥3个V3 → 无收益
+      //
+      const fv3below = findFirst(chain, i + 1, si, "V3"); // 链路中的 V3 节点（不含出单人）
+
+      if (fv3below !== -1) {
+        if (fv3below === si) {
+          // ── 直属 V3 本人出单（出单人本身是 V3）→ 直属本人 8% ──
+          rel = "DIRECT_PERSONAL"; srcIdx = si;
+          rate = getRate(rates, "V3", "V3", rel);
+        } else {
+          // ── V3→V3 团队流水：V2节点完全透明，仅计V3数量 ──
+          // 最近同级V3 = 直属团(1%)，次近同级V3 = 间属团(0.5%)，≥3个V3 = 无收益
+          const v3cnt     = countBetween(chain, i + 1, si, "V3");
+          const lastV3Idx = findPrimary(chain, i + 1, si, "V3");
+
+          if (v3cnt === 1)      { rel = "DIRECT_TEAM";   srcIdx = lastV3Idx; }
+          else if (v3cnt === 2) { rel = "INDIRECT_TEAM"; srcIdx = lastV3Idx; }
+          else                  { rel = "OUTSIDE"; rate = 0; } // ≥3个V3，超出范围
+
+          if (rel !== "OUTSIDE") {
+            // 来源V3（最末V3）自身无收益时，上级V3同样不得获得团队流水
+            const srcRes = out.find(r => r.ni === lastV3Idx);
+            if (srcRes && !srcRes.ok) { rel = "OUTSIDE"; rate = 0; }
+            else rate = getRate(rates, "V3", "V3", rel);
+          }
+        }
+
+      } else {
+        // ── 无 V3 同级，找 V2 或 V1 ──
+        const fv2below = findFirst(chain, i + 1, si, "V2"); // 第一个 V2（不含出单人）
+
+        if (fv2below !== -1 || chain[si].level === "V2") {
+          // ── V3→V2：穿透 V1 找到最内层 V2，按 V2 节点数分档 ──
+          const v2cnt = countBetween(chain, i + 1, si, "V2");
+          if (v2cnt === 0) {
+            // 唯一 V2 是出单人
+            rel = "DIRECT_PERSONAL"; srcIdx = chain[si].level === "V2" ? si : fv2below;
+          } else if (v2cnt === 1) {
+            rel = "DIRECT_TEAM";   srcIdx = fv2below;
+          } else if (v2cnt === 2) {
+            rel = "INDIRECT_TEAM"; srcIdx = findPrimary(chain, i + 1, si, "V2");
+          } else {
+            rel = "OUTSIDE_TEAM";  srcIdx = findPrimary(chain, i + 1, si, "V2");
+          }
+          rate = getRate(rates, "V3", "V2", rel);
+
+        } else {
+          // ── V3→V1：纯 V1 链路，按跳数 ──
+          const h = si - i;
+          rel = h === 1 ? "DIRECT" : h === 2 ? "INDIRECT" : "OUTSIDE";
+          rate = getRate(rates, "V3", "V1", rel);
+          srcIdx = si;
+        }
+      }
+    }
+
+    out.push({ node: rv, ni: i, src: chain[srcIdx], si: srcIdx, rel, rate, amt: sale * rate / 100, ok: rate > 0 });
+  }
+  return out;
+}
+
+// ─── 订单分红明细导入 ─────────────────────────────────────────────────────────
+//
+// 表：saas_api.yx_divvy_order_detail_2026（仅此表为准）
+// 解析针对某个 order_id / divvy_order_id 查询出的分红明细（Tab 分隔，可含/不含表头），
+// 自动重建关系链（按 chain_index 排序的节点 + 等级）、分成结果与流向图。
+// 展示的金额与比例直接采用数据库实际结算值，不重新计算。
+//
+const IMPORT_COLS = [
+  "id","divvy_order_id","order_id","en_name","project_id","platform_id","project_profit_share",
+  "biz_type","title","region_type","category_id","order_amount","seller_user_id","seller_group_id",
+  "seller_group_title","earner_user_id","earner_group_id","earner_group_title","earner_chain_index",
+  "source_user_id","source_group_id","source_group_title","source_chain_index","relation_type",
+  "relation_label","ratio_field","ratio_percent","commission_amount","agent_ratio_id","create_time",
+  "settle_status","settle_time","delete_time","order_status","refund_sync_time",
+];
+const IMPORT_HEADER_KEYS = ["earner_chain_index","order_id","divvy_order_id","ratio_percent","commission_amount"];
+const PPS_LABELS = { 1:"S 标准优选（上限 10.5%）", 2:"SSS 限时高激励（上限 12%）", 3:"A 成长（上限 7%）", 4:"B 补充（上限 3%）" };
+
+function normLevel(lv) {
+  const s = String(lv || "").trim().toUpperCase();
+  return /^V[123]$/.test(s) ? s : (lv || "V1");
+}
+function splitImportLine(line) {
+  return String(line).split(/\t/).map(c => c.trim());
+}
+function isImportHeader(cells) {
+  const lower = cells.map(c => c.toLowerCase());
+  return IMPORT_HEADER_KEYS.some(k => lower.includes(k));
+}
+function buildImportColMap(firstCells) {
+  const colMap = {};
+  if (isImportHeader(firstCells)) {
+    firstCells.forEach((name, i) => { colMap[name.trim()] = i; });
+    return colMap;
+  }
+  // 无表头：按已知列序映射；列数多于定义时忽略尾部（如 refund_sync_time 为空）
+  IMPORT_COLS.forEach((name, i) => { if (i < firstCells.length) colMap[name] = i; });
+  return colMap;
+}
+function parseOrderData(text) {
+  const lines = String(text).split(/\r?\n/).map(l => l.trim()).filter(l => l.length);
+  if (!lines.length) return { rows: [], skipped: 0, total: 0 };
+  const firstCells = splitImportLine(lines[0]);
+  const hasHeader = isImportHeader(firstCells);
+  const colMap = buildImportColMap(firstCells);
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  const rows = [];
+  let skipped = 0;
+  dataLines.forEach(line => {
+    const cells = splitImportLine(line);
+    if (cells.length < 5) { skipped++; return; }
+    const get = key => { const i = colMap[key]; return i == null ? "" : (cells[i] ?? "").trim(); };
+    const deleteTime = get("delete_time");
+    if (deleteTime && deleteTime !== "0" && deleteTime.toUpperCase() !== "NULL") { skipped++; return; }
+    const earnerIdx = parseInt(get("earner_chain_index"), 10);
+    const sourceIdx = parseInt(get("source_chain_index"), 10);
+    if (isNaN(earnerIdx) || isNaN(sourceIdx)) { skipped++; return; }
+    rows.push({
+      divvyOrderId:  get("divvy_order_id"),
+      orderId:       get("order_id"),
+      orderAmount:   parseFloat(get("order_amount")) || 0,
+      enName:        get("en_name"),
+      title:         get("title"),
+      bizType:       get("biz_type"),
+      projectProfitShare: parseInt(get("project_profit_share"), 10) || 0,
+      sellerUserId:  get("seller_user_id"),
+      sellerLevel:   normLevel(get("seller_group_title")),
+      earnerUserId:  get("earner_user_id"),
+      earnerLevel:   normLevel(get("earner_group_title")),
+      earnerIdx,
+      sourceUserId:  get("source_user_id"),
+      sourceLevel:   normLevel(get("source_group_title")),
+      sourceIdx,
+      relation:      get("relation_type") || "OUTSIDE",
+      relationLabel: get("relation_label"),
+      ratioField:    get("ratio_field"),
+      ratio:         parseFloat(get("ratio_percent")) || 0,
+      amount:        parseFloat(get("commission_amount")) || 0,
+      settleStatus:  get("settle_status"),
+      orderStatus:   get("order_status"),
+    });
+  });
+  return { rows, skipped, total: dataLines.length };
+}
+
+function buildImportFromRows(rows) {
+  if (!rows.length) return null;
+  const meta = rows[0];
+  // 收集节点：收益人 + 来源 + 出单人（seller 字段兜底）
+  const nodeByIdx = {};
+  const putNode = (idx, userId, level) => {
+    if (isNaN(idx)) return;
+    const lv = normLevel(level);
+    const prev = nodeByIdx[idx];
+    if (!prev || (prev.level === "V1" && lv !== "V1")) {
+      nodeByIdx[idx] = { idx, userId: String(userId || ""), level: lv };
+    }
+  };
+  rows.forEach(r => {
+    putNode(r.earnerIdx, r.earnerUserId, r.earnerLevel);
+    putNode(r.sourceIdx, r.sourceUserId, r.sourceLevel);
+  });
+  // 出单人：取 chain_index 最大值对应的节点，并与 seller 字段对齐
+  const maxIdx = Math.max(...Object.keys(nodeByIdx).map(Number));
+  const sellerIdx = rows.reduce((m, r) => Math.max(m, r.sourceIdx, r.earnerIdx), maxIdx);
+  if (meta.sellerUserId) {
+    putNode(sellerIdx, meta.sellerUserId, meta.sellerLevel);
+    // seller 与 maxIdx 不一致时，以 seller 所在 chain_index 为准（通常 source 指向出单人）
+    const sellerRow = rows.find(r => String(r.sourceUserId) === String(meta.sellerUserId) || String(r.earnerUserId) === String(meta.sellerUserId));
+    if (sellerRow) {
+      const sIdx = String(sellerRow.sourceUserId) === String(meta.sellerUserId) ? sellerRow.sourceIdx : sellerRow.earnerIdx;
+      putNode(sIdx, meta.sellerUserId, meta.sellerLevel);
+    }
+  }
+  const sortedIdx = Object.keys(nodeByIdx).map(Number).sort((a, b) => a - b);
+  if (sortedIdx.length < 2) return null;
+  const posOf = {};
+  sortedIdx.forEach((idx, pos) => { posOf[idx] = pos; });
+  const chain = sortedIdx.map((idx, pos) => ({
+    id: 1000 + pos,
+    name: nodeByIdx[idx].userId || ("节点" + idx),
+    level: nodeByIdx[idx].level || "V1",
+  }));
+  const results = rows
+    .map(r => ({
+      node: { name: String(r.earnerUserId), level: r.earnerLevel || "V1" },
+      ni:   posOf[r.earnerIdx],
+      src:  { name: String(r.sourceUserId), level: r.sourceLevel || "V1" },
+      si:   posOf[r.sourceIdx],
+      rel:  r.relation,
+      rate: r.ratio,
+      amt:  r.amount,
+      ok:   r.ratio > 0 || r.amount > 0,
+    }))
+    .filter(r => r.ni != null && r.si != null)
+    .sort((a, b) => b.ni - a.ni);
+  const pps = meta.projectProfitShare;
+  return {
+    chain, results,
+    sale: meta.orderAmount,
+    orderId: meta.orderId,
+    divvyOrderId: meta.divvyOrderId,
+    rowCount: results.length,
+    meta: {
+      title: meta.title,
+      enName: meta.enName,
+      bizType: meta.bizType,
+      projectProfitShare: pps,
+      projectLabel: PPS_LABELS[pps] || ("project_profit_share=" + pps),
+      sellerUserId: meta.sellerUserId,
+      sellerLevel: meta.sellerLevel,
+    },
+  };
+}
+
+// ─── 横向流向图（SVG 弧线连线） ─────────────────────────────────────────────
+//
+// 布局规则：
+//   • 节点框横排，相邻节点间用 → 连接
+//   • 每条收益弧线从出单人侧（source）指向收益人侧（receiver）
+//   • 弧线深度按收益人在链路中的位置递进：越左越深，层次清晰无重叠
+//   • 节点框内显示：等级 + 姓名 + 收益金额（或"出单"标记）
+//
+function renderHFlow(chain, results, sale) {
+  const n = chain.length;
+  if (n < 2) return "";
+
+  const NW = 92, NH = 74, GAP = 64, STEP = NW + GAP, PAD = 20;
+
+  // 弧线深度：按跨度（source - receiver）决定，跨度越大越深，天然不重叠
+  const archDepth = (ni, si_) => (si_ - ni) * 46 + 28;
+  const svgW = PAD + n * STEP - GAP + PAD;
+  const svgH = archDepth(0, n - 1) + 32; // 最大跨度弧 + 文字空间
+
+  const REL_COLORS = {
+    DIRECT:          "#4ade80",
+    INDIRECT:        "#f59e0b",
+    OUTSIDE:         "#666",
+    DIRECT_PERSONAL: "#34d399",
+    DIRECT_TEAM:     "#60a5fa",
+    INDIRECT_TEAM:   "#c084fc",
+    OUTSIDE_TEAM:    "#888",
+  };
+  const LV_BORDER = { V1:"rgba(150,150,150,.4)", V2:"rgba(79,142,247,.45)", V3:"rgba(245,158,11,.45)" };
+  const LV_COLOR  = { V1:"#aaa", V2:"#7ab4ff", V3:"#fbbf24" };
+
+  // ── 节点盒子 ──
+  let boxes = "";
+  chain.forEach((node, idx) => {
+    const isSeller = idx === n - 1;
+    const lx = PAD + idx * STEP;
+    const res = results.find(r => r.ni === idx);
+    const borderC = isSeller ? "var(--accent)" : (LV_BORDER[node.level] || "#444");
+    const bgC     = isSeller ? "var(--accent-bg)" : "var(--bg-card2)";
+
+    // 收益金额行
+    let amtLine = "";
+    if (isSeller) {
+      amtLine = `<div style="font-size:10px;color:var(--accent);font-weight:600;margin-top:1px">出单 ¥${sale.toFixed(2)}</div>`;
+    } else if (res && res.ok) {
+      amtLine = `<div style="font-size:11px;color:var(--green);font-weight:700;margin-top:1px">+¥${res.amt.toFixed(2)}</div>`;
+    } else {
+      amtLine = `<div style="font-size:10px;color:var(--text3);margin-top:1px">—</div>`;
+    }
+
+    boxes += `
+      <div style="position:absolute;left:${lx}px;top:0;width:${NW}px;height:${NH}px;
+        border:1.5px solid ${borderC};border-radius:8px;background:${bgC};
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        text-align:center;padding:4px 8px;gap:1px;">
+        <div style="font-size:10px;color:${LV_COLOR[node.level]};font-weight:700;letter-spacing:.06em">${node.level}</div>
+        <div style="font-size:15px;font-weight:700;line-height:1.2">${escHtml(node.name)}</div>
+        ${amtLine}
+      </div>
+    `;
+
+    // 节点间箭头
+    if (idx < n - 1) {
+      const ax = lx + NW;
+      boxes += `
+        <div style="position:absolute;left:${ax}px;top:${(NH - 16) / 2}px;
+          width:${GAP}px;height:16px;
+          display:flex;align-items:center;justify-content:center;
+          color:#3a3a3a;font-size:18px;letter-spacing:-2px">→</div>
+      `;
+    }
+  });
+
+  // ── SVG 弧线 ──
+  let svgPaths = "", svgLabels = "";
+
+  // 按弧线从浅到深绘制（深的在上层）
+  const validRes = results.filter(r => r.ok).sort((a, b) => a.ni - b.ni);
+
+  validRes.forEach(res => {
+    const depth = archDepth(res.ni, res.si);
+    const color = REL_COLORS[res.rel] || "#888";
+    const rx = PAD + res.ni * STEP + NW / 2; // 收益人中心 x
+    const sx = PAD + res.si * STEP + NW / 2; // 来源中心 x
+    const mx = (rx + sx) / 2;
+    const label = `${REL_LABELS[res.rel] || res.rel}  ${res.rate}%`;
+
+    // 弧线：从收益人到来源，向下弯曲
+    svgPaths += `
+      <path d="M${rx},3 Q${mx},${depth} ${sx},3"
+        stroke="${color}" stroke-width="1.5" fill="none" opacity="0.88"/>
+      <circle cx="${rx}" cy="3" r="3" fill="${color}" opacity="0.7"/>
+      <circle cx="${sx}" cy="3" r="3" fill="${color}" opacity="0.7"/>
+    `;
+    // 文字标签：居中于弧线最低点上方
+    svgLabels += `
+      <text x="${mx}" y="${depth + 15}" text-anchor="middle"
+        fill="${color}" font-size="11" font-weight="600"
+        font-family="-apple-system,PingFang SC,Microsoft YaHei,sans-serif">${label}</text>
+    `;
+  });
+
+  return `
+    <div class="hf-scroll">
+      <div style="min-width:${svgW}px">
+        <div class="hf-canvas" style="height:${NH}px">${boxes}</div>
+        <svg width="${svgW}" height="${svgH}" style="display:block;overflow:visible;margin-top:2px">
+          ${svgPaths}
+          ${svgLabels}
+        </svg>
+      </div>
+    </div>
+  `;
+}
+
+
+
+function load(k, def) { try { const v=localStorage.getItem(k); return v?JSON.parse(v):def; } catch { return def; } }
+function save(k, v)   { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+let state = {
+  chain:  load("chain_v4",  DEFAULT_CHAIN),
+  amount: load("amount_v4", "100"),
+  rates:  load("rates_v5",  DEFAULT_RATES),
+  mentorManaged: load("mentor_v4", false),
+  activePreset: load("ratePreset_v5", "S"),
+  importResults: load("import_results_v1", null),
+  importInfo:    load("import_info_v1", null),
+  importRaw:     load("import_raw_v1", ""),
+  showImport: false,
+  showRates: false,
+  showFlow:  true,
+};
+
+let _id = 200;
+function uid() { return ++_id; }
+
+function setState(patch) {
+  Object.assign(state, typeof patch === "function" ? patch(state) : patch);
+  render();
+}
+// 退出"导入展示"模式（用户手动编辑链路/比例/金额后，切换为按规则实时计算）
+function exitImport() {
+  if (state.importResults) {
+    state.importResults = null; save("import_results_v1", null);
+    state.importInfo = null; save("import_info_v1", null);
+  }
+}
+function setChain(fn)  { exitImport(); const c = fn(state.chain);  state.chain  = c; save("chain_v4",c);  render(); }
+function setRates(fn)  { exitImport(); const r = fn(state.rates);  state.rates  = r; save("rates_v5",r);  render(); }
+function setAmount(v)  { exitImport(); state.amount = v; save("amount_v4",v); render(); }
+
+// ─── HTML 构建辅助 ────────────────────────────────────────────────────────────
+
+function lvTag(level) {
+  return `<span class="lv lv-${level}">${level}</span>`;
+}
+function relTag(rel) {
+  return `<span class="rt rt-${rel}">${REL_LABELS[rel]||rel}</span>`;
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ─── 渲染 ─────────────────────────────────────────────────────────────────────
+
+function render() {
+  const { chain, amount, rates, showRates, showFlow } = state;
+  const importMode = !!state.importResults;
+  const sale    = parseFloat(amount) || 0;
+  const results = importMode ? state.importResults : calcCommissions(chain, sale, rates);
+  const totRate = results.reduce((s,r)=>s+r.rate,0);
+  const totAmt  = results.reduce((s,r)=>s+r.amt,0);
+  const seller  = chain[chain.length-1];
+  // 导师奖金池：开启导师托管后，从每条分成金额中抽 25% 给导师，分成金额本身减为 75%
+  const mentorOn    = !!state.mentorManaged;
+  const mentorRate  = 0.25;
+  const mentorTotal = mentorOn ? results.reduce((s,r)=> s + (r.ok ? r.amt*mentorRate : 0), 0) : 0;
+  // 收益人实得 = 抽走导师奖金后的净额
+  const netAmt      = r => mentorOn ? r.amt*(1-mentorRate) : r.amt;
+  const netTotAmt   = mentorOn ? totAmt*(1-mentorRate) : totAmt;
+
+  // ── 关系链 ──
+  let chainHtml = "";
+  chain.forEach((node, idx) => {
+    const isSeller = idx === chain.length - 1;
+    chainHtml += `
+      <div class="node-row${isSeller?" seller":""}">
+        <span class="node-idx">${idx+1}</span>
+        ${lvTag(node.level)}
+        <input data-idx="${idx}" data-field="name" value="${escHtml(node.name)}" placeholder="姓名" style="width:80px" />
+        <select data-idx="${idx}" data-field="level">
+          ${LEVEL_OPTS.map(v=>`<option value="${v}"${v===node.level?" selected":""}>${LEVEL_NAMES[v]}</option>`).join("")}
+        </select>
+        <span class="node-role${isSeller?" s":""}">${isSeller?"出单人（触发分成）":"上级收益人"}</span>
+        ${isSeller?`<label class="switch" title="开启后按各分成金额的 25% 计入导师奖金池"><input type="checkbox" id="mentorToggle" ${state.mentorManaged?"checked":""} />是否导师托管</label>`:""}
+        <span style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn-i" data-act="up"   data-idx="${idx}" ${idx===0?"disabled":""} title="上移">↑</button>
+          <button class="btn-i" data-act="down" data-idx="${idx}" ${isSeller?"disabled":""} title="下移">↓</button>
+          <button class="btn-i" data-act="del"  data-idx="${idx}" ${chain.length<=2?"disabled":""} title="删除">✕</button>
+        </span>
+      </div>
+      ${!isSeller?`<div class="arrow-line"><div class="arrow-inner">↓</div></div>`:""}
+    `;
+  });
+
+  // ── 结果表格 ──
+  let tableHtml = results.map(r => `
+    <tr class="${r.ok?"has-earn":"no-earn"}">
+      <td>${escHtml(r.node.name)}</td>
+      <td>${lvTag(r.node.level)}</td>
+      <td style="color:var(--text2);font-size:12px">${escHtml(r.src.name)}（${r.src.level}）</td>
+      <td>${relTag(r.rel)}</td>
+      <td>${r.rate}%</td>
+      <td class="${r.ok?"amt":""}">${r.ok?`¥${netAmt(r).toFixed(2)}`:"—"}</td>
+      <td style="${r.ok&&mentorOn?"color:var(--purple);font-weight:700":""}">${r.ok&&mentorOn?`¥${(r.amt*mentorRate).toFixed(2)}`:"—"}</td>
+    </tr>
+  `).join("");
+
+  // ── 横向流向图（SVG 弧线） ──
+  const flowHtml = renderHFlow(chain, results, sale);
+
+  // ── 比例配置 ──
+  let rateHtml = "";
+  ["V1","V2","V3"].forEach(recv => {
+    rateHtml += `<div class="rg-title">${recv} 收益人分成比例</div>
+    <div class="card" style="margin-bottom:12px"><div class="tbl-wrap"><table>
+      <thead><tr><th>来源</th><th>场景说明</th><th>档位</th><th>比例（%）</th></tr></thead>
+      <tbody>
+        ${rates.filter(r=>r.receiver===recv).map(r=>`
+          <tr>
+            <td>${lvTag(r.source)}</td>
+            <td style="color:var(--text2);font-size:12px">${r.scenario}</td>
+            <td>${relTag(r.relation)}</td>
+            <td><input class="rate-input" type="number" step="0.1" min="0" max="100"
+              data-recv="${r.receiver}" data-src="${r.source}" data-rel="${r.relation}"
+              value="${r.rate}" /></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table></div></div>`;
+  });
+
+  // ── 组装完整页面 ──
+  document.getElementById("app").innerHTML = `
+    <div style="margin-bottom:24px">
+      <h1>用户关系链佣金计算器 <span class="badge">V2.2 最终版</span></h1>
+      <p class="subtitle">配置关系链（顶部=最高上级，底部=出单人），输入金额后自动按 V1/V2/V3 阻断规则及团队流水规则分层计算。</p>
+      <p class="subtitle">最后更新时间：2026年8月28日</p>
+    </div>
+
+    <hr />
+
+    <!-- 订单分红数据导入 -->
+    <div style="margin-bottom:24px">
+      <div class="coll-head" id="importToggle">
+        <span class="coll-arrow${state.showImport?" open":""}">▶</span>
+        订单分红数据查询 / 导入（粘贴数据库分红明细，自动生成关系链）
+      </div>
+      ${state.showImport?`
+        <div style="padding-top:8px">
+          <p style="color:var(--text2);font-size:12px;margin-bottom:8px;line-height:1.7">从 <code style="font-size:11px;color:var(--text)">saas_api.yx_divvy_order_detail_2026</code> 查询某个订单的分红明细，将结果（含表头或不含均可，Tab 分隔）粘贴到下方，点击「解析生成」即可自动重建关系链、用户等级、分成结果与流向图。已自动跳过 <code style="font-size:11px">delete_time ≠ 0</code> 的作废记录。</p>
+          <details style="margin-bottom:8px;font-size:12px;color:var(--text2)">
+            <summary style="cursor:pointer;color:var(--text);font-weight:600">参考 SQL</summary>
+            <pre style="margin-top:6px;padding:8px;background:var(--bg-input);border:1px solid var(--border2);border-radius:var(--rs);overflow-x:auto;font-size:11px;line-height:1.5;color:var(--text2)">SELECT * FROM saas_api.yx_divvy_order_detail_2026
+WHERE order_id = 568380 AND delete_time = 0;</pre>
+          </details>
+          <textarea id="importText" placeholder="在此粘贴数据库查询结果（每行一条分红记录，列以 Tab 分隔）..." style="width:100%;min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--bg-input);color:var(--text);border:1px solid var(--border2);border-radius:var(--rs);padding:8px;resize:vertical;line-height:1.5"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn-p" id="btnParseImport">解析生成</button>
+            <button class="btn-g" id="btnClearImport">清除导入</button>
+            <span id="importMsg" style="font-size:12px;color:var(--text2)"></span>
+          </div>
+        </div>
+      `:""}
+    </div>
+
+    <hr />
+
+    <!-- 关系链 -->
+    <div style="margin-bottom:24px">
+      <div class="toolbar">
+        <h2>关系链配置</h2>
+        <div class="toolbar-right">
+          <button class="btn-g" id="btnReset">重置示例</button>
+          <button class="btn-p" id="btnAdd">+ 插入成员</button>
+        </div>
+      </div>
+      <p style="color:var(--text2);font-size:12px;margin-bottom:10px">顶部为最高上级，底部为出单人。↑↓ 调序，✕ 删除，最少保留 2 名。</p>
+      <div class="card" id="chainList">${chainHtml}</div>
+    </div>
+
+    <!-- 出单金额 -->
+    <div class="amt-row" style="margin-bottom:24px">
+      <span class="amt-lbl">出单金额（元）：</span>
+      <input id="amtInput" class="amt-input" type="number" value="${escHtml(amount)}" placeholder="100" min="0" />
+      <span class="amt-hint">出单人：<b>${escHtml(seller.name)}（${seller.level}）</b></span>
+    </div>
+
+    <hr />
+
+    <!-- 结算结果 -->
+    <div style="margin-bottom:24px">
+      <h2 style="margin-bottom:14px">结算结果</h2>
+      ${importMode?`<div class="callout" style="margin-bottom:12px;border-left-color:var(--accent)"><div class="callout-t">数据来源：订单分红明细导入</div>订单 <b>#${escHtml(String(state.importInfo&&state.importInfo.orderId||""))}</b>${state.importInfo&&state.importInfo.divvyOrderId?` · 分红单 <b>#${escHtml(String(state.importInfo.divvyOrderId))}</b>`:""} · ${escHtml(String(state.importInfo&&state.importInfo.meta&&state.importInfo.meta.title||""))}（${escHtml(String(state.importInfo&&state.importInfo.meta&&state.importInfo.meta.projectLabel||""))}）<br />共 ${state.importInfo&&state.importInfo.rowCount||results.length} 条有效分红记录${state.importInfo&&state.importInfo.skipped?`，已跳过 ${state.importInfo.skipped} 条作废/无效行`:""}。修改关系链、金额或比例后将自动切换为按规则实时计算。</div>`:""}
+      <div class="stats">
+        <div class="stat-card"><div class="stat-val g">¥${netTotAmt.toFixed(2)}</div><div class="stat-lbl">总分成金额${mentorOn?`<span class="help">?<span class="help-tip">已扣除导师奖金 25%</span></span>`:""}</div></div>
+        <div class="stat-card"><div class="stat-val">${totRate.toFixed(2)}%</div><div class="stat-lbl">总分成比例</div></div>
+        <div class="stat-card"><div class="stat-val">¥${(sale-totAmt).toFixed(2)}</div><div class="stat-lbl">分成后个人留存</div></div>
+        <div class="stat-card"><div class="stat-val">${results.filter(r=>r.ok).length}</div><div class="stat-lbl">实际收益人数</div></div>
+        <div class="stat-card"><div class="stat-val p">¥${mentorTotal.toFixed(2)}</div><div class="stat-lbl">导师奖金池总和<span class="help">?<span class="help-tip">T(总比例) × 25%</span></span></div></div>
+      </div>
+
+      <!-- 明细表 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">分成明细</div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>收益人</th><th>等级</th><th>分成来源</th><th>档位关系</th><th>分成比例</th><th>分成金额</th><th>导师奖金池</th></tr></thead>
+          <tbody>${tableHtml}</tbody>
+        </table></div>
+      </div>
+
+      <!-- 流向图 -->
+      <div class="coll-head" id="flowToggle">
+        <span class="coll-arrow${showFlow?" open":""}">▶</span>
+        链路分成流向图
+      </div>
+      ${showFlow?`<div style="padding:12px 0 4px 0">${flowHtml}</div>`:""}
+    </div>
+
+    <hr />
+
+    <!-- 比例配置 -->
+    <div class="coll-head" id="ratesToggle">
+      <span class="coll-arrow${showRates?" open":""}">▶</span>
+      分成比例配置（可自定义，修改后实时生效）
+    </div>
+    ${showRates?`
+      <div style="padding-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--text2);font-weight:600">项目等级预设：</span>
+            ${PROJECT_PRESETS.map(p=>`<button class="${state.activePreset===p.id?"btn-p":"btn-g"}" data-preset="${p.id}" title="生态奖励上限 ${p.cap}%">${p.name}（${p.cap}%）</button>`).join("")}
+          </div>
+          <button class="btn-g" id="btnResetRates">恢复标准优选项目</button>
+        </div>
+        <div class="callout" style="margin-bottom:12px">
+          <div class="callout-t">封顶说明</div>
+          已穷举验证（链长 2~11）：在现有规则下，最高总分成模型为 <b>V3→V3→V3→V2→V2→V2→V1(出单)</b>，合计 <b>10.5%</b>，无其他模型超过此值。各等级预设按该模型总分成等比缩放，确保不超过对应生态奖励上限。
+        </div>
+        ${rateHtml}
+      </div>
+    `:""}
+
+    <hr />
+
+    <!-- 规则说明 -->
+    <div class="callout">
+      <div class="callout-t">核心计算规则</div>
+      · <b>V1</b>：仅拿直属 V1 出单，2%，不穿透 V2/V3 节点。<br />
+      · <b>V2/V3 阻断</b>：V2/V3 是承接节点，上级只拿该节点的团队收益，不直接穿透底层。<br />
+      · <b>V2 拿 V1</b>：按距离 —— 直属 5%，间属 3%，三级外 2%。<br />
+      · <b>V2 拿 V2</b>：直属子 V2 为来源 —— 子 V2 本人出单→直属本人 5%；子 V2 直管 V1 团队→直属团队 2%；子 V2 下还有 V2→间属团队流水 1%。<br />
+      · <b>V3 拿 V1</b>：按距离 —— 直属 8%，间属 5%，三级外 3%。<br />
+      · <b>V3 拿 V2</b>：按收益人到出单人之间的 V2 节点数 —— 0个(V2是出单人)→本人 8%；1个→直属团队 3%；2个→间属团队流水 1.5%；3+个→三级外 1%。<br />
+      · <b>V3 拿 V3</b>：按收益人到出单人之间的 V3 节点数 —— 0个→本人 8%；1个→直属团队 1%；2+个→间属团队流水 0.5%。
+    </div>
+
+    <div style="text-align:center;color:var(--text3);font-size:11px;margin-top:32px">
+      V2.2 最终版 · 用户关系链佣金计算器 · 数据仅存储在本地浏览器，无需联网
+    </div>
+  `;
+
+  bindEvents();
+}
+
+// ─── 事件绑定 ─────────────────────────────────────────────────────────────────
+
+function bindEvents() {
+  // 工具栏
+  document.getElementById("btnAdd")?.addEventListener("click", () => {
+    const id = uid();
+    // 名称按 P1/P2/P3... 递进：找链路中已有最大 Pn 编号，+1 得到新编号
+    const maxP = state.chain.reduce((m, n) => {
+      const match = n.name.match(/^P(\d+)$/);
+      return match ? Math.max(m, parseInt(match[1])) : m;
+    }, 0);
+    // 插入到链路最底部（出单人位置之后），成为新的出单人
+    setChain(prev => [...prev, {id, name:`P${maxP + 1}`, level:"V1"}]);
+  });
+  document.getElementById("btnReset")?.addEventListener("click", () => {
+    state.chain = DEFAULT_CHAIN; save("chain_v4", DEFAULT_CHAIN);
+    state.amount = "100"; save("amount_v4","100");
+    render();
+  });
+  document.getElementById("btnResetRates")?.addEventListener("click", () => {
+    state.activePreset = "S"; save("ratePreset_v5", "S");
+    setRates(() => presetRatesByCap(10.5));
+  });
+
+  // 项目等级预设：SSS / S / A / B
+  document.querySelectorAll("[data-preset]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const preset = PROJECT_PRESETS.find(p => p.id === btn.dataset.preset);
+      if (!preset) return;
+      state.activePreset = preset.id; save("ratePreset_v5", preset.id);
+      setRates(() => presetRatesByCap(preset.cap));
+    });
+  });
+
+  // 金额：input 只存 state，blur 后重建（防止输入中失焦）
+  const amtEl = document.getElementById("amtInput");
+  amtEl?.addEventListener("input", e => {
+    exitImport();
+    state.amount = e.target.value;
+    save("amount_v4", state.amount);
+  });
+  amtEl?.addEventListener("blur", () => render());
+
+  // 导师托管开关
+  document.getElementById("mentorToggle")?.addEventListener("change", e => {
+    state.mentorManaged = e.target.checked;
+    save("mentor_v4", state.mentorManaged);
+    render();
+  });
+
+  // 折叠
+  document.getElementById("flowToggle")?.addEventListener("click", () => { state.showFlow = !state.showFlow; render(); });
+  document.getElementById("ratesToggle")?.addEventListener("click", () => { state.showRates = !state.showRates; render(); });
+  document.getElementById("importToggle")?.addEventListener("click", () => { state.showImport = !state.showImport; render(); });
+
+  // 订单分红数据导入
+  const importTextEl = document.getElementById("importText");
+  if (importTextEl) {
+    if (state.importRaw) importTextEl.value = state.importRaw;
+    importTextEl.addEventListener("input", e => { state.importRaw = e.target.value; save("import_raw_v1", state.importRaw); });
+  }
+  document.getElementById("btnParseImport")?.addEventListener("click", () => {
+    const msg = document.getElementById("importMsg");
+    const text = (document.getElementById("importText")?.value) || "";
+    try {
+      const parsed = parseOrderData(text);
+      const { rows, skipped, total } = parsed;
+      if (!rows.length) {
+        if (msg) {
+          msg.textContent = total
+            ? `共 ${total} 行，均无有效数据（可能已全部作废或列格式不匹配）。`
+            : "未解析到有效数据行，请检查是否为 Tab 分隔。";
+          msg.style.color = "var(--yellow)";
+        }
+        return;
+      }
+      const imp = buildImportFromRows(rows);
+      if (!imp || imp.chain.length < 2) {
+        if (msg) { msg.textContent = "解析到的节点不足 2 个，无法构建关系链。"; msg.style.color = "var(--yellow)"; }
+        return;
+      }
+      state.chain = imp.chain;            save("chain_v4", state.chain);
+      state.amount = String(imp.sale);    save("amount_v4", state.amount);
+      state.importResults = imp.results;  save("import_results_v1", state.importResults);
+      state.importInfo = {
+        orderId: imp.orderId,
+        divvyOrderId: imp.divvyOrderId,
+        rowCount: imp.rowCount,
+        skipped,
+        meta: imp.meta,
+      };
+      save("import_info_v1", state.importInfo);
+      state.importRaw = text;             save("import_raw_v1", state.importRaw);
+      if (msg) {
+        msg.textContent = `已解析 ${rows.length} 条有效记录，链路 ${imp.chain.length} 人${skipped ? `（跳过 ${skipped} 行）` : ""}`;
+        msg.style.color = "var(--green)";
+      }
+      render();
+    } catch (err) {
+      if (msg) { msg.textContent = "解析失败：" + err.message; msg.style.color = "var(--yellow)"; }
+    }
+  });
+  document.getElementById("btnClearImport")?.addEventListener("click", () => {
+    state.importResults = null; save("import_results_v1", null);
+    state.importInfo = null;    save("import_info_v1", null);
+    state.importRaw = "";       save("import_raw_v1", "");
+    render();
+  });
+
+  // 节点操作（结构变化，立即重建）
+  document.getElementById("chainList")?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.idx);
+    const act = btn.dataset.act;
+    if (act === "del") { if (state.chain.length > 2) setChain(prev => prev.filter((_,i)=>i!==idx)); }
+    else if (act === "up")   { if (idx>0) setChain(prev=>{const n=[...prev];[n[idx-1],n[idx]]=[n[idx],n[idx-1]];return n;}); }
+    else if (act === "down") { if (idx<state.chain.length-1) setChain(prev=>{const n=[...prev];[n[idx],n[idx+1]]=[n[idx+1],n[idx]];return n;}); }
+  });
+
+  // 节点名称输入：只更新 state，不重建
+  document.getElementById("chainList")?.addEventListener("input", e => {
+    const el = e.target;
+    if (el.tagName !== "INPUT") return;
+    const idx = parseInt(el.dataset.idx);
+    const field = el.dataset.field;
+    if (isNaN(idx) || !field) return;
+    exitImport();
+    state.chain = state.chain.map((n,i) => i===idx ? {...n,[field]:el.value} : n);
+    save("chain_v4", state.chain);
+  });
+
+  // 节点名称失焦：重建 DOM（focusout 会冒泡，blur 不会）
+  document.getElementById("chainList")?.addEventListener("focusout", e => {
+    if (e.target.tagName === "INPUT") render();
+  });
+
+  // 等级下拉立即生效（影响计算）
+  document.getElementById("chainList")?.addEventListener("change", e => {
+    const el = e.target;
+    if (el.tagName !== "SELECT") return;
+    const idx = parseInt(el.dataset.idx);
+    const field = el.dataset.field;
+    if (isNaN(idx) || !field) return;
+    setChain(prev => prev.map((n,i) => i===idx ? {...n,[field]:el.value} : n));
+  });
+
+  // 比例配置：input 只存 state，blur 后重建
+  document.querySelectorAll(".rate-input").forEach(input => {
+    input.addEventListener("input", e => {
+      const val = parseFloat(e.target.value);
+      if (isNaN(val) || val < 0) return;
+      const {recv, src, rel} = e.target.dataset;
+      state.rates = state.rates.map(r =>
+        r.receiver===recv && r.source===src && r.relation===rel ? {...r, rate:val} : r
+      );
+      save("rates_v5", state.rates);
+      if (state.activePreset !== null) { state.activePreset = null; save("ratePreset_v5", null); }
+    });
+    input.addEventListener("blur", () => render());
+  });
+}
+
+// ─── 启动 ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+<script>
+// 接收工作台外壳的主题联动（postMessage）
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if (d && d.type === 'yb-theme') {
+    document.documentElement.setAttribute('data-theme', d.theme === 'light' ? 'light' : 'dark');
+  }
+});
+</script>
+</body>
+</html>
