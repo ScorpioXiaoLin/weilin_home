@@ -4,21 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>正则提取</title>
+<link rel="stylesheet" href="../common.css" />
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  :root[data-theme="dark"]{
-    --bg:#0d0d0d;--bg-card:#1a1a1a;--bg-card2:#222;--bg-hover:#2a2a2a;--bg-input:#111;
-    --border:#2e2e2e;--border2:#3a3a3a;--text:#f0f0f0;--text2:#999;--text3:#555;
-    --accent:#4f8ef7;--accent2:#3d7ae0;--accent-bg:rgba(79,142,247,.15);
-    --green:#4ade80;--red:#f87171;--yellow:#f59e0b;--mark:rgba(245,158,11,.32);
-  }
-  :root[data-theme="light"]{
-    --bg:#f4f6f9;--bg-card:#fff;--bg-card2:#f0f2f5;--bg-hover:#eef1f5;--bg-input:#fff;
-    --border:#e4e7ec;--border2:#d5d9df;--text:#1a1d21;--text2:#5c636e;--text3:#9aa1ab;
-    --accent:#2f6bef;--accent2:#2457cc;--accent-bg:rgba(47,107,239,.1);
-    --green:#16a34a;--red:#dc2626;--yellow:#d97706;--mark:rgba(217,119,6,.28);
-  }
-  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;transition:background .25s,color .25s}
+  /* regex 专属额外变量 */
+  :root[data-theme="dark"]{--mark:rgba(245,158,11,.32)}
+  :root[data-theme="light"]{--mark:rgba(217,119,6,.28)}
   .wrap{max-width:960px;margin:0 auto;padding:24px 20px 60px}
   h1{font-size:18px;font-weight:700;margin-bottom:16px}
   .card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
@@ -182,7 +172,7 @@
           </select>
         </div>
         <div class="fld">
-          <label>上下文定位</label>
+          <label>上下文定位范围</label>
           <select id="genCtx">
             <option value="0">不使用上下文（仅匹配内容本身）</option>
             <option value="1">前后各 1 个字符定位</option>
@@ -191,6 +181,14 @@
             <option value="all">整行前后全部作为定位</option>
           </select>
         </div>
+      </div>
+      <div class="fld">
+        <label>上下文处理方式</label>
+        <select id="genCtxMode">
+          <option value="literal">字面精确（前后原文字符，定位更准）</option>
+          <option value="smart">智能泛化（前后也变 \d+ / [A-Za-z]+，更通用）</option>
+        </select>
+        <div class="sub">示例：<code>...119xxx900...</code> 选「字面精确」得 <code>119([A-Za-z]+)900</code>；选「智能泛化」得通用式 <code>\d+([A-Za-z]+)\d+</code>，可同时命中不同样本。</div>
       </div>
       <div class="fld">
         <div class="flags">
@@ -261,7 +259,6 @@
           <div class="cheat-row"><code>(a|b)</code><span>a 或 b</span></div>
         </div>
       </div>
-      <div class="sub" style="margin-top:12px">参考：<a href="https://www.jyshare.com/front-end/854/" target="_blank" rel="noopener">菜鸟工具 · 正则表达式在线测试</a></div>
     </div>
   </details>
 </div>
@@ -476,10 +473,13 @@ function buildExpr(){
   const reset=()=>{ $('genOut').value=''; $('genPreview').value=''; };
   if(!target){ reset(); msg.textContent='请先输入「需要提取的内容」'; msg.className='msg err'; return; }
   const mode=$('genMode').value, exact=$('genExact').checked, anchor=$('genAnchor').checked, ctx=$('genCtx').value;
+  const ctxMode=$('genCtxMode').value;
   const useCtx = ctx!=='0';
   const tp = mode==='literal' ? escapeLit(target) : generalizeLine(target, exact);
   const grouped = useCtx ? '('+tp+')' : tp;   // 有上下文时把内容放入捕获组便于提取
   genUsesGroup = useCtx;
+  // 上下文渲染：字面精确 or 智能泛化（用于生成通用式正则）
+  const ctxRender = s => s==='' ? '' : (ctxMode==='smart' ? generalizeLine(s, exact) : escapeLit(s));
 
   const lines=source.split(/\r?\n/).filter(l=>l.trim());
   const parts=new Set();
@@ -493,7 +493,7 @@ function buildExpr(){
       if(idx<0) return;
       let before=line.slice(0,idx), after=line.slice(idx+target.length);
       if(ctx!=='all'){ const n=parseInt(ctx,10); before=before.slice(-n); after=after.slice(0,n); }
-      parts.add(escapeLit(before)+grouped+escapeLit(after));
+      parts.add(ctxRender(before)+grouped+ctxRender(after));
     });
     if(!parts.size){ reset(); msg.textContent='✗ 在「完整字符串」中未找到「需要提取的内容」，请检查是否一致'; msg.className='msg err'; return; }
   }
@@ -540,8 +540,6 @@ function switchTab(p){
 
 run();
 </script>
-<script>
-window.addEventListener('message',function(e){if(e.data&&e.data.type==='yb-theme'){document.documentElement.setAttribute('data-theme',e.data.theme==='light'?'light':'dark');}});
-</script>
+<script src="../common.js"></script>
 </body>
 </html>
