@@ -84,10 +84,11 @@
   /* 首页浮动预览示意 */
   .hint{margin-top:40px;display:flex;align-items:center;gap:10px;color:var(--text3);font-size:12.5px}
 
-  /* ===== iframe 视图 ===== */
-  .frame-view{position:absolute;inset:0;display:none;animation:fade .35s ease}
+  /* ===== iframe 视图（每个工具独立 iframe，切换只显隐、不重载） ===== */
+  .frame-view{position:absolute;inset:0;display:none}
   .frame-view.show{display:block}
-  .frame-view iframe{width:100%;height:100%;border:0;background:var(--bg)}
+  .frame-view iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .16s ease}
+  .frame-view iframe.on{opacity:1;pointer-events:auto}
 
   /* 占位（coming soon）视图 */
   .placeholder{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
@@ -153,10 +154,8 @@
         </div>
       </section>
 
-      <!-- iframe 演示 -->
-      <section class="frame-view" id="frameView">
-        <iframe id="frame" title="demo" referrerpolicy="no-referrer"></iframe>
-      </section>
+      <!-- iframe 演示：每个工具的 iframe 由 JS 动态创建并缓存保活 -->
+      <section class="frame-view" id="frameView"></section>
 
       <!-- 占位 -->
       <section class="placeholder" id="placeholder">
@@ -185,7 +184,7 @@ const DEMOS = [
 const $ = s => document.querySelector(s);
 const navDemos = $('#nav-demos'), cards = $('#cards');
 const homeView = $('#homeView'), frameView = $('#frameView'), placeholder = $('#placeholder');
-const frame = $('#frame'), crumb = $('#crumb'), crumbSub = $('#crumb-sub'), openNew = $('#openNew');
+const crumb = $('#crumb'), crumbSub = $('#crumb-sub'), openNew = $('#openNew');
 const side = $('#side'), scrim = $('#scrim');
 
 /* 构建左侧导航 + 首页卡片 */
@@ -215,6 +214,24 @@ function showView(which){
   placeholder.classList.toggle('show', which==='placeholder');
 }
 
+/* ===== 工具 iframe 缓存：每个工具一个 iframe，首次进入才加载，之后只显隐 ===== */
+const frames = {}; // id -> iframe
+function getFrame(d){
+  if(frames[d.id]) return frames[d.id];
+  const f = document.createElement('iframe');
+  f.title = d.title; f.dataset.id = d.id;
+  f.setAttribute('referrerpolicy','no-referrer');
+  f.addEventListener('load', ()=>syncFrame(root.getAttribute('data-theme'), f)); // 加载完同步当前主题
+  f.src = d.file;
+  frameView.appendChild(f);
+  frames[d.id] = f;
+  return f;
+}
+function showFrame(d){
+  getFrame(d);
+  Object.values(frames).forEach(f=>f.classList.toggle('on', f.dataset.id===d.id));
+}
+
 function go(id){
   closeSide();
   if(id==='home'){
@@ -231,7 +248,7 @@ function go(id){
   crumbSub.textContent = d.desc;
   history.replaceState(null,'','#'+id);
   if(d.ready && d.file){
-    if(frame.getAttribute('src')!==d.file) frame.setAttribute('src', d.file);
+    showFrame(d);
     openNew.href = d.file; openNew.style.display='inline-flex';
     showView('frame');
   }else{
@@ -251,8 +268,9 @@ const ICON = {
   moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
   sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
 };
-function syncFrame(t){                       // 把主题广播给右侧 iframe 内的 demo
-  try{ frame.contentWindow && frame.contentWindow.postMessage({type:'yb-theme', theme:t}, '*'); }catch(e){}
+function syncFrame(t, target){               // 把主题广播给右侧 iframe 内的 demo（不传 target 则广播给全部已加载的）
+  const list = target ? [target] : Object.values(frames);
+  list.forEach(f=>{ try{ f.contentWindow && f.contentWindow.postMessage({type:'yb-theme', theme:t}, '*'); }catch(e){} });
 }
 function applyTheme(t){
   root.setAttribute('data-theme', t);
@@ -262,7 +280,6 @@ function applyTheme(t){
 }
 themeBtn.onclick = ()=>applyTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');
 applyTheme(localStorage.getItem('yb-theme') || 'dark');
-frame.addEventListener('load', ()=>syncFrame(root.getAttribute('data-theme'))); // iframe 换页后同步当前主题
 
 /* ===== 移动端侧栏 ===== */
 function openSide(){ side.classList.add('open'); scrim.classList.add('show'); }
@@ -272,6 +289,14 @@ $('#hamb').onclick = openSide; scrim.onclick = closeSide;
 /* ===== 深链 / 初始路由 ===== */
 go((location.hash||'').replace('#','') || 'home');
 window.addEventListener('hashchange', ()=>go((location.hash||'').replace('#','')||'home'));
+
+/* ===== 空闲预加载：浏览器空闲时把各工具的 iframe 预先建好，首次点击也基本无感 ===== */
+(function preload(){
+  const todo = DEMOS.filter(d=>d.ready && d.file);
+  const run = ()=> todo.forEach(getFrame);
+  if('requestIdleCallback' in window) requestIdleCallback(run, {timeout:4000});
+  else setTimeout(run, 1500);
+})();
 </script>
 </body>
 </html>
