@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>链接转二维码</title>
+<link rel="stylesheet" href="../common.css" />
+<style>
+  .wrap{max-width:880px;margin:0 auto;padding:24px 20px 60px}
+  h1{font-size:18px;font-weight:700;margin-bottom:6px}
+  .lead{font-size:13px;color:var(--text2);margin-bottom:16px}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+  @media(max-width:760px){.layout{grid-template-columns:1fr}}
+  .card{min-width:0;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .decode-card{margin-top:16px}
+  .card h2{font-size:14px;font-weight:700;margin-bottom:12px}
+  label{font-size:12px;color:var(--text2);display:block;margin-bottom:6px}
+  textarea,input[type=text]{width:100%;font-family:inherit;font-size:14px;line-height:1.6;background:var(--bg-input);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;outline:none}
+  textarea{min-height:140px;resize:vertical}
+  textarea:focus,input[type=text]:focus{border-color:var(--accent)}
+  .chk{display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:13px;color:var(--text2);cursor:pointer}
+  .chk input{margin-top:3px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  button{font-size:13px;font-family:inherit;border:1px solid var(--border2);cursor:pointer;border-radius:8px;padding:8px 14px;background:transparent;color:var(--text2)}
+  button:hover{background:var(--bg-hover);color:var(--text)}
+  button.p{background:var(--accent);color:#fff;border-color:transparent;font-weight:600}
+  button.p:hover{background:var(--accent2)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .stage{width:100%;background:#fff;border:1px dashed #d5d9df;border-radius:12px;min-height:280px;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden}
+  canvas{display:block;width:min(260px,100%);height:auto;aspect-ratio:1;image-rendering:pixelated}
+  [hidden]{display:none!important}
+  .empty{width:100%;color:#98a2b3;font-size:13px;text-align:center;line-height:1.7;white-space:normal}
+  .empty strong{display:block;color:#667085;font-size:14px;margin-bottom:4px}
+  .meta{margin-top:12px;font-size:12px;color:var(--text3);word-break:break-all;line-height:1.6}
+  .meta b{color:var(--text2);font-weight:600}
+  .err{margin-top:10px;color:var(--red);font-size:12.5px}
+  .drop{border:1px dashed var(--border2);border-radius:10px;padding:22px 16px;text-align:center;background:var(--bg-input);color:var(--text3);font-size:12.5px}
+  .drop.over{border-color:var(--accent);background:var(--accent-bg);color:var(--text)}
+  .drop button{margin-bottom:8px}
+  .result{margin-top:14px}
+  .result-row{display:flex;gap:8px;align-items:flex-start}
+  .result-row input{flex:1}
+  .history-card{margin-top:16px}
+  .history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .history-head h2{margin-bottom:0}
+  .history-head button{padding:6px 11px;font-size:12px}
+  .history-list{display:flex;flex-direction:column;gap:8px}
+  .history-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--border);border-radius:9px;background:var(--bg-input)}
+  .history-link{color:var(--text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .history-sub{display:flex;align-items:center;gap:8px;margin-top:3px;color:var(--text3);font-size:11px}
+  .history-tag{padding:1px 7px;border-radius:99px;background:var(--accent-bg);color:var(--accent)}
+  .history-actions{display:flex;gap:6px}
+  .history-actions button{padding:5px 9px;font-size:12px}
+  .history-none{padding:24px 12px;text-align:center;color:var(--text3);font-size:12.5px;border:1px dashed var(--border2);border-radius:9px}
+  @media(max-width:600px){
+    .result-row{flex-wrap:wrap}.result-row input{flex-basis:100%}
+    .history-item{grid-template-columns:1fr}
+    .history-actions{justify-content:flex-end}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>链接转二维码</h1>
+  <p class="lead">粘贴链接后点击生成，用手机扫一扫即可打开。也可以上传二维码图片，在本地解析出其中的内容。内容不会上传。</p>
+  <div class="layout">
+    <div class="card">
+      <label for="link">链接</label>
+      <textarea id="link" spellcheck="false" placeholder="https://example.com/path"></textarea>
+      <label class="chk"><input id="https" type="checkbox" checked /> 没有 http 开头时，自动补成 https://，方便扫码直接打开网页</label>
+      <div class="actions">
+        <button class="p" id="generate">生成二维码</button>
+        <button id="download" disabled>下载 PNG</button>
+        <button id="clear">清空</button>
+      </div>
+      <div id="err" class="err" hidden></div>
+    </div>
+    <div class="card">
+      <div class="stage" id="stage">
+        <canvas id="cv" hidden></canvas>
+        <div class="empty" id="placeholder"><strong>暂无二维码</strong>填写链接后，点击「生成二维码」</div>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+
+  <div class="card decode-card">
+    <h2>解析二维码</h2>
+    <div class="drop" id="drop">
+      <input id="file" type="file" accept="image/*" hidden />
+      <button type="button" id="pick">选择图片</button>
+      <div>或把二维码图片拖到这里，支持 PNG、JPG</div>
+    </div>
+    <div class="result" id="result" hidden>
+      <label for="decoded">识别内容</label>
+      <div class="result-row">
+        <input id="decoded" type="text" readonly />
+        <button type="button" id="copyDecoded">复制</button>
+        <button type="button" id="fillDecoded">填入链接</button>
+      </div>
+    </div>
+    <div id="decodeErr" class="err" hidden></div>
+  </div>
+
+  <div class="card history-card">
+    <div class="history-head">
+      <h2>历史记录</h2>
+      <button type="button" id="clearHistory" hidden>清空记录</button>
+    </div>
+    <div id="historyList" class="history-list"></div>
+  </div>
+</div>
+<script src="qrcode-lib.js"></script>
+<script src="jsQR.js"></script>
+<script>
+(function () {
+  var link = document.getElementById("link");
+  var https = document.getElementById("https");
+  var canvas = document.getElementById("cv");
+  var placeholder = document.getElementById("placeholder");
+  var meta = document.getElementById("meta");
+  var err = document.getElementById("err");
+  var download = document.getElementById("download");
+  var file = document.getElementById("file");
+  var drop = document.getElementById("drop");
+  var result = document.getElementById("result");
+  var decoded = document.getElementById("decoded");
+  var decodeErr = document.getElementById("decodeErr");
+  var historyList = document.getElementById("historyList");
+  var clearHistory = document.getElementById("clearHistory");
+  var historyKey = "qrcode_history_v1";
+  var history = [];
+  var payload = "";
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch];
+    });
+  }
+
+  function encodeText(raw) {
+    var text = raw.replace(/^\s+|\s+$/g, "");
+    if (!text) return "";
+    if (https.checked && !/^[a-z][a-z0-9+.-]*:/i.test(text) && !/\s/.test(text)) {
+      text = "https://" + text.replace(/^\/+/, "");
+    }
+    return text;
+  }
+
+  function loadHistory() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(historyKey) || "[]");
+      history = Array.isArray(saved) ? saved.filter(function (item) {
+        return item && typeof item.value === "string";
+      }).slice(0, 50) : [];
+    } catch (e) {
+      history = [];
+    }
+  }
+
+  function saveHistory() {
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(history));
+    } catch (e) {}
+  }
+
+  function formatTime(time) {
+    var date = new Date(time);
+    if (isNaN(date.getTime())) return "";
+    function pad(n) { return String(n).padStart(2, "0"); }
+    return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) +
+      " " + pad(date.getHours()) + ":" + pad(date.getMinutes());
+  }
+
+  function renderHistory() {
+    clearHistory.hidden = history.length === 0;
+    if (!history.length) {
+      historyList.innerHTML = '<div class="history-none">暂无记录，成功生成或识别二维码后会自动保存在这里</div>';
+      return;
+    }
+    historyList.innerHTML = history.map(function (item, index) {
+      return '<div class="history-item">' +
+        '<div><div class="history-link" title="' + escapeHtml(item.value) + '">' + escapeHtml(item.value) + '</div>' +
+        '<div class="history-sub"><span class="history-tag">' + (item.type === "decode" ? "识别" : "生成") +
+        '</span><span>' + formatTime(item.time) + '</span></div></div>' +
+        '<div class="history-actions"><button type="button" data-action="fill" data-index="' + index +
+        '">填入</button><button type="button" data-action="copy" data-index="' + index +
+        '">复制</button><button type="button" data-action="delete" data-index="' + index + '">删除</button></div></div>';
+    }).join("");
+  }
+
+  function addHistory(value, type) {
+    value = String(value || "").trim();
+    if (!value) return;
+    history = history.filter(function (item) { return item.value !== value; });
+    history.unshift({ value: value, type: type, time: Date.now() });
+    history = history.slice(0, 50);
+    saveHistory();
+    renderHistory();
+  }
+
+  function copyText(value) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(value);
+    }
+    var helper = document.createElement("textarea");
+    helper.value = value;
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand("copy");
+    helper.remove();
+  }
+
+  function showPlaceholder() {
+    payload = "";
+    canvas.hidden = true;
+    placeholder.hidden = false;
+    download.disabled = true;
+    meta.textContent = "";
+  }
+
+  function draw(text) {
+    var qr = qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    var count = qr.getModuleCount();
+    var cell = 10;
+    var margin = 4;
+    var size = (count + margin * 2) * cell;
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = "#000000";
+    for (var r = 0; r < count; r++) {
+      for (var c = 0; c < count; c++) {
+        if (qr.isDark(r, c)) ctx.fillRect((c + margin) * cell, (r + margin) * cell, cell, cell);
+      }
+    }
+  }
+
+  function generate() {
+    var text = encodeText(link.value);
+    err.hidden = true;
+    err.textContent = "";
+    if (!text) {
+      showPlaceholder();
+      err.hidden = false;
+      err.textContent = "请先粘贴链接。";
+      return;
+    }
+    try {
+      draw(text);
+      payload = text;
+      canvas.hidden = false;
+      placeholder.hidden = true;
+      download.disabled = false;
+      meta.innerHTML = "<b>二维码内容</b><br />" + escapeHtml(text);
+      addHistory(text, "generate");
+    } catch (e) {
+      showPlaceholder();
+      err.hidden = false;
+      err.textContent = "这段内容太长，二维码放不下。请缩短链接后再试。";
+    }
+  }
+
+  function decodeFile(imageFile) {
+    decodeErr.hidden = true;
+    decodeErr.textContent = "";
+    if (!imageFile) return;
+    if (imageFile.type && imageFile.type.indexOf("image/") !== 0) {
+      result.hidden = true;
+      decodeErr.hidden = false;
+      decodeErr.textContent = "请上传图片文件。";
+      return;
+    }
+    var url = URL.createObjectURL(imageFile);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var maxSide = 1600;
+      var scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      var w = Math.max(1, Math.round(img.naturalWidth * scale));
+      var h = Math.max(1, Math.round(img.naturalHeight * scale));
+      var shot = document.createElement("canvas");
+      shot.width = w;
+      shot.height = h;
+      var ctx = shot.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      var imageData = ctx.getImageData(0, 0, w, h);
+      var code = jsQR(imageData.data, w, h, { inversionAttempts: "attemptBoth" });
+      if (!code || !code.data) {
+        result.hidden = true;
+        decoded.value = "";
+        decodeErr.hidden = false;
+        decodeErr.textContent = "没有识别到二维码。请换一张更清晰的图片。";
+        return;
+      }
+      decoded.value = code.data;
+      result.hidden = false;
+      addHistory(code.data, "decode");
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      result.hidden = true;
+      decodeErr.hidden = false;
+      decodeErr.textContent = "图片读取失败，请重新选择。";
+    };
+    img.src = url;
+  }
+
+  document.getElementById("generate").addEventListener("click", generate);
+  function invalidateIfStale() {
+    if (payload && encodeText(link.value) !== payload) {
+      err.hidden = true;
+      err.textContent = "";
+      showPlaceholder();
+    }
+  }
+  link.addEventListener("input", invalidateIfStale);
+  https.addEventListener("change", invalidateIfStale);
+  link.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") generate();
+  });
+  document.getElementById("clear").addEventListener("click", function () {
+    link.value = "";
+    err.hidden = true;
+    err.textContent = "";
+    showPlaceholder();
+    link.focus();
+  });
+  download.addEventListener("click", function () {
+    if (!payload) return;
+    var a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = "qrcode.png";
+    a.click();
+  });
+
+  document.getElementById("pick").addEventListener("click", function () { file.click(); });
+  file.addEventListener("change", function () {
+    if (file.files && file.files[0]) decodeFile(file.files[0]);
+    file.value = "";
+  });
+  ["dragenter", "dragover"].forEach(function (name) {
+    drop.addEventListener(name, function (e) {
+      e.preventDefault();
+      drop.classList.add("over");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (name) {
+    drop.addEventListener(name, function (e) {
+      e.preventDefault();
+      drop.classList.remove("over");
+    });
+  });
+  drop.addEventListener("drop", function (e) {
+    var dropped = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (dropped) decodeFile(dropped);
+  });
+  document.getElementById("copyDecoded").addEventListener("click", function () {
+    if (!decoded.value) return;
+    copyText(decoded.value);
+  });
+  document.getElementById("fillDecoded").addEventListener("click", function () {
+    if (!decoded.value) return;
+    link.value = decoded.value;
+    invalidateIfStale();
+    link.focus();
+  });
+
+  historyList.addEventListener("click", function (e) {
+    var button = e.target.closest("button[data-action]");
+    if (!button) return;
+    var index = Number(button.dataset.index);
+    var item = history[index];
+    if (!item) return;
+    if (button.dataset.action === "fill") {
+      link.value = item.value;
+      invalidateIfStale();
+      link.focus();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (button.dataset.action === "copy") {
+      copyText(item.value);
+    } else if (button.dataset.action === "delete") {
+      history.splice(index, 1);
+      saveHistory();
+      renderHistory();
+    }
+  });
+  clearHistory.addEventListener("click", function () {
+    if (!history.length || !window.confirm("确定清空全部二维码历史记录吗？")) return;
+    history = [];
+    saveHistory();
+    renderHistory();
+  });
+
+  loadHistory();
+  renderHistory();
+  showPlaceholder();
+})();
+</script>
+<script src="../common.js"></script>
+</body>
+</html>

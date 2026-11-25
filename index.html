@@ -178,6 +178,7 @@ const DEMOS = [
   { id:'regex',      title:'正则提取', desc:'粘贴文本按正则提取/高亮/替换，含表达式校验、常用表达式库，并可由示例内容反向生成正则。', icon:'🔍', file:'tools/regex.html', ready:true },
   { id:'random',     title:'随机字符串', desc:'按字符类型与长度生成随机字符串，支持排除相似字符、更改自动生成与最近生成记录。', icon:'🎲', file:'tools/random.html', ready:true },
   { id:'calculator', title:'佣金计算器', desc:'分销关系链分层佣金测算，支持 V1/V2/V3 阻断与团队流水规则。', icon:'💰', file:'tools/calculator.html', ready:true },
+  { id:'qrcode',     title:'二维码生成/解析', desc:'粘贴链接生成二维码，上传图片识别二维码内容，并在本地保存历史记录。', icon:'▦', file:'tools/qrcode.html', ready:true },
   { id:'more',       title:'更多工具', desc:'后续新增的静态演示都会出现在这里。', icon:'✨', file:'', ready:false },
 ];
 
@@ -200,7 +201,7 @@ DEMOS.forEach(d=>{
   card.innerHTML = `<div class="ico">${d.icon}</div>
     <h3>${d.title} ${d.ready?'':'<span class="tag-soon">待上线</span>'}</h3>
     <p>${d.desc}</p>
-    ${d.ready?'<div class="go">进入 →</div>':''}`;
+    ${d.ready?'<div class="go">跳转 →</div>':''}`;
   card.onclick = ()=>go(d.id);
   cards.appendChild(card);
 });
@@ -236,7 +237,7 @@ function go(id){
   closeSide();
   if(id==='home'){
     setActive('home'); showView('home');
-    crumb.childNodes[0].nodeValue='首页'; crumbSub.textContent='选择左侧的演示开始';
+    crumb.childNodes[0].nodeValue='首页'; crumbSub.textContent='聚合常用的小工具，方便日常使用';
     openNew.style.display='none';
     history.replaceState(null,'','#');
     return;
